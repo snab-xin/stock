@@ -1,0 +1,12 @@
+.bin/
+bin/
+.idea/
+.vscode/
+.env
+# 本地可改，示例见 config.example.yaml；若不想提交个人限流设定可取消下一行注释
+# config.yaml
+*.exe
+*.test
+*.out
+tmp/
+vendor/
