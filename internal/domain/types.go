@@ -102,3 +102,82 @@ type IngestRun struct {
 }
 
 func (IngestRun) TableName() string { return "ingest_run" }
+
+// CBBasic 可转债基础信息。自然键：TSCode。来源 Tushare cb_basic。
+type CBBasic struct {
+	Audit
+	TSCode            string
+	BondFullName      string
+	BondShortName     string
+	CBCode            string `gorm:"column:cb_code"`
+	CBType            string `gorm:"column:cb_type"`
+	StkCode           string
+	StkShortName      string
+	Maturity          *float64
+	Par               *float64
+	IssuePrice        *float64
+	IssueSize         *float64
+	RemainSize        *float64
+	ValueDate         *time.Time
+	MaturityDate      *time.Time
+	RateType          string
+	CouponRate        *float64
+	AddRate           *float64
+	PayPerYear        *int
+	ListDate          *time.Time
+	DelistDate        *time.Time
+	Exchange          string
+	ConvStartDate     *time.Time
+	ConvEndDate       *time.Time
+	ConvStopDate      *time.Time
+	FirstConvPrice    *float64
+	ConvPrice         *float64
+	RateClause        string
+	PutClause         string
+	MaturityCallPrice *float64
+	CallClause        string
+	ResetClause       string
+	ConvClause        string
+	Guarantor         string
+	GuaranteeType     string
+	IssueRating       string
+	NewestRating      string
+	RatingComp        string
+}
+
+func (CBBasic) TableName() string { return "cb_basic" }
+
+// CBTopHolder 可转债前十大持有人。自然键：TSCode + EndDate + HolderRank。
+type CBTopHolder struct {
+	Audit
+	TSCode     string
+	EndDate    time.Time
+	HolderRank int
+	HolderName string
+	HoldAmount *float64 // 万张
+	HoldRatio  *float64 // %
+}
+
+func (CBTopHolder) TableName() string { return "cb_top_holder" }
+
+// CBDaily 可转债日线。自然键：TSCode + TradeDate。来源 Tushare cb_daily。
+type CBDaily struct {
+	Audit
+	TSCode       string
+	TradeDate    time.Time
+	PreClose     *float64
+	Open         *float64
+	High         *float64
+	Low          *float64
+	Close        *float64
+	Change       *float64
+	PctChg       *float64
+	Volume       *float64 // 手
+	Amount       *float64 // 万元
+	BondValue    *float64
+	BondOverRate *float64
+	CBValue      *float64 `gorm:"column:cb_value"`
+	CBOverRate   *float64 `gorm:"column:cb_over_rate"`
+}
+
+func (CBDaily) TableName() string { return "cb_daily" }

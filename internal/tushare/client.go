@@ -13,24 +13,32 @@ import (
 )
 
 const defaultURL = "https://api.tushare.pro"
+const defaultRPM = 200
 
 type Client struct {
 	token      string
 	endpoint   string
 	httpClient *http.Client
-	rpm        int
-	minGap     time.Duration
+	defaultRPM int
+	apis       map[string]int
 
 	mu   sync.Mutex
-	last time.Time
+	last map[string]time.Time // 按 api_name 分桶
 }
 
-func NewClient(token, endpoint string, rpm int) *Client {
+func NewClient(token, endpoint string, defaultRPM int, apis map[string]int) *Client {
 	if endpoint == "" {
 		endpoint = defaultURL
 	}
-	if rpm <= 0 {
-		rpm = 200
+	if defaultRPM <= 0 {
+		defaultRPM = defaultRPMFallback()
+	}
+	copied := map[string]int{}
+	for k, v := range apis {
+		if k == "" || v <= 0 {
+			continue
+		}
+		copied[k] = v
 	}
 	return &Client{
 		token:    token,
@@ -38,14 +46,39 @@ func NewClient(token, endpoint string, rpm int) *Client {
 		httpClient: &http.Client{
 			Timeout: 45 * time.Second,
 		},
-		rpm:    rpm,
-		minGap: time.Minute / time.Duration(rpm),
+		defaultRPM: defaultRPM,
+		apis:       copied,
+		last:       map[string]time.Time{},
 	}
 }
 
-func (c *Client) RPM() int { return c.rpm }
+func defaultRPMFallback() int { return defaultRPM }
 
-func (c *Client) MinGap() time.Duration { return c.minGap }
+// RPM 返回默认每分钟上限。
+func (c *Client) RPM() int { return c.defaultRPM }
+
+// RPMFor 返回指定接口的每分钟上限；未配置则用默认。
+func (c *Client) RPMFor(apiName string) int {
+	if apiName != "" {
+		if n, ok := c.apis[apiName]; ok && n > 0 {
+			return n
+		}
+	}
+	if c.defaultRPM > 0 {
+		return c.defaultRPM
+	}
+	return defaultRPM
+}
+
+// MinGap 默认接口间隔。
+func (c *Client) MinGap() time.Duration {
+	return time.Minute / time.Duration(c.RPMFor(""))
+}
+
+// MinGapFor 指定接口间隔。
+func (c *Client) MinGapFor(apiName string) time.Duration {
+	return time.Minute / time.Duration(c.RPMFor(apiName))
+}
 
 type apiRequest struct {
 	APIName string            `json:"api_name"`
@@ -67,7 +100,7 @@ func (c *Client) Query(ctx context.Context, apiName string, params map[string]st
 	if c.token == "" {
 		return nil, fmt.Errorf("未配置 TUSHARE_TOKEN，请写入 .env")
 	}
-	if err := c.wait(ctx); err != nil {
+	if err := c.wait(ctx, apiName); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +122,7 @@ func (c *Client) Query(ctx context.Context, apiName string, params map[string]st
 				return nil, ctx.Err()
 			case <-time.After(time.Duration(attempt) * time.Second):
 			}
-			if err := c.wait(ctx); err != nil {
+			if err := c.wait(ctx, apiName); err != nil {
 				return nil, err
 			}
 		}
@@ -135,18 +168,23 @@ func (c *Client) Query(ctx context.Context, apiName string, params map[string]st
 	return nil, lastErr
 }
 
-// wait 按配置的 rpm 均匀限流：两次请求至少间隔 60s/rpm。
-func (c *Client) wait(ctx context.Context) error {
+// wait 按接口 rpm 均匀限流：同一 api_name 两次请求至少间隔 60s/rpm。
+func (c *Client) wait(ctx context.Context, apiName string) error {
+	rpm := c.RPMFor(apiName)
+	minGap := time.Minute / time.Duration(rpm)
+
 	c.mu.Lock()
-	wait := c.minGap - time.Since(c.last)
+	prev := c.last[apiName]
+	wait := minGap - time.Since(prev)
 	c.mu.Unlock()
 
 	if wait > 0 {
 		slog.Debug("tushare rate limit wait",
 			"component", "tushare",
+			"api", apiName,
 			"wait", wait.Round(time.Millisecond).String(),
-			"rpm", c.rpm,
-			"gap", c.minGap.String(),
+			"rpm", rpm,
+			"gap", minGap.String(),
 		)
 		select {
 		case <-ctx.Done():
@@ -156,7 +194,7 @@ func (c *Client) wait(ctx context.Context) error {
 	}
 
 	c.mu.Lock()
-	c.last = time.Now()
+	c.last[apiName] = time.Now()
 	c.mu.Unlock()
 	return nil
 }

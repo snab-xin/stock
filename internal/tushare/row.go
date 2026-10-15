@@ -90,3 +90,30 @@ func (r Row) Bool01(key string) bool {
 	s := r.Str(key)
 	return s == "1" || strings.EqualFold(s, "true")
 }
+
+func (r Row) Int(key string) (int, bool) {
+	s := r.Str(key)
+	if s == "" || s == "nan" || s == "NaN" || s == "None" {
+		return 0, false
+	}
+	if strings.Contains(s, ".") {
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, false
+		}
+		return int(math.Round(f)), true
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+func (r Row) IntPtr(key string) *int {
+	v, ok := r.Int(key)
+	if !ok {
+		return nil
+	}
+	return &v
+}

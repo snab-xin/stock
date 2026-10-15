@@ -16,6 +16,7 @@ func NewMux(gdb *gorm.DB, cfg config.Config, runner *ingest.Runner) http.Handler
 		cfg:         cfg,
 		instruments: repo.NewInstrumentRepo(gdb),
 		market:      repo.NewMarketRepo(gdb),
+		cb:          repo.NewCBRepo(gdb),
 		runs:        repo.NewIngestRunRepo(gdb),
 		runner:      runner,
 	}
@@ -28,7 +29,7 @@ func newEngine(h *Handler) *gin.Engine {
 	r.Use(recoveryLogger(), requestLogger())
 	r.Use(cors.New(cors.Config{
 		AllowAllOrigins: true,
-		AllowMethods:    []string{"GET", "POST", "OPTIONS"},
+		AllowMethods:    []string{"GET", "POST", "PUT", "OPTIONS"},
 		AllowHeaders:    []string{"Content-Type"},
 	}))
 	_ = r.SetTrustedProxies(nil)
@@ -44,6 +45,10 @@ func newEngine(h *Handler) *gin.Engine {
 		api.GET("/ingest/status", h.ingestStatus)
 		api.POST("/ingest", h.ingestStart)
 		api.POST("/backtest", h.backtest)
+		api.GET("/cb", h.cbList)
+		api.GET("/cb/:code/neighbors", h.cbNeighbors)
+		api.GET("/cb/:code", h.cbDetail)
+		api.PUT("/cb/:code/holders", h.cbReplaceHolders)
 	}
 	return r
 }

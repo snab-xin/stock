@@ -16,6 +16,7 @@ type Service struct {
 	Source      MarketSource
 	Instruments *repo.InstrumentRepo
 	Market      *repo.MarketRepo
+	CB          *repo.CBRepo
 	Runs        *repo.IngestRunRepo
 	log         *slog.Logger
 }
@@ -192,6 +193,122 @@ func (s *Service) syncCodeRange(ctx context.Context, code string, start, end tim
 		"adj", len(adjs),
 	)
 	return int64(len(bars) + len(adjs)), nil
+}
+
+func (s *Service) SyncCBBasic(ctx context.Context) error {
+	if s.CB == nil {
+		return fmt.Errorf("未配置可转债仓储")
+	}
+	return s.withRun(ctx, "cb_basic", func() (int64, error) {
+		items, err := s.Source.ListCBBasic(ctx)
+		if err != nil {
+			return 0, err
+		}
+		if err := s.CB.UpsertBasic(ctx, items); err != nil {
+			return 0, err
+		}
+		s.logger().Info("cb_basic upserted", "rows", len(items))
+		return int64(len(items)), nil
+	})
+}
+
+func (s *Service) SyncCBDaily(ctx context.Context, start, end, tradeDate time.Time, codes []string) error {
+	if s.CB == nil {
+		return fmt.Errorf("未配置可转债仓储")
+	}
+	return s.withRun(ctx, "cb_daily", func() (int64, error) {
+		var total int64
+		if !tradeDate.IsZero() {
+			rows, err := s.Source.ListCBDaily(ctx, CBDailyQuery{TradeDate: tradeDate})
+			if err != nil {
+				return 0, err
+			}
+			if err := s.CB.UpsertDaily(ctx, rows); err != nil {
+				return 0, err
+			}
+			s.logger().Info("cb_daily upserted", "trade_date", dates.ISO(tradeDate), "rows", len(rows))
+			return int64(len(rows)), nil
+		}
+		if start.IsZero() || end.IsZero() {
+			return 0, fmt.Errorf("cb_daily 需要 trade_date，或 start 与 end")
+		}
+		if len(codes) == 0 {
+			// 按交易日截面拉全市场（与股票 daily 类似）
+			for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+				rows, err := s.Source.ListCBDaily(ctx, CBDailyQuery{TradeDate: d})
+				if err != nil {
+					return total, err
+				}
+				if len(rows) == 0 {
+					continue
+				}
+				if err := s.CB.UpsertDaily(ctx, rows); err != nil {
+					return total, err
+				}
+				total += int64(len(rows))
+				s.logger().Info("cb_daily upserted", "trade_date", dates.ISO(d), "rows", len(rows))
+			}
+			return total, nil
+		}
+		for _, code := range codes {
+			rows, err := s.Source.ListCBDaily(ctx, CBDailyQuery{TSCode: code, Start: start, End: end})
+			if err != nil {
+				return total, err
+			}
+			if err := s.CB.UpsertDaily(ctx, rows); err != nil {
+				return total, err
+			}
+			total += int64(len(rows))
+			s.logger().Info("cb_daily upserted", "ts_code", code, "rows", len(rows))
+		}
+		return total, nil
+	})
+}
+
+func (s *Service) SyncCBTopHolders(ctx context.Context, period, start, end time.Time, codes []string) error {
+	if s.CB == nil {
+		return fmt.Errorf("未配置可转债仓储")
+	}
+	return s.withRun(ctx, "cb_holders", func() (int64, error) {
+		if len(codes) == 0 {
+			var err error
+			codes, err = s.CB.ListTSCodes(ctx)
+			if err != nil {
+				return 0, err
+			}
+			if len(codes) == 0 {
+				return 0, fmt.Errorf("库中没有可转债，请先 ingest cb-basic；未指定 -code 时按库内全部转债同步")
+			}
+			s.logger().Info("cb_holders using all bonds in db", "count", len(codes))
+		}
+		const batch = 20
+		var total int64
+		for i := 0; i < len(codes); i += batch {
+			j := i + batch
+			if j > len(codes) {
+				j = len(codes)
+			}
+			rows, err := s.Source.ListCBTopHolders(ctx, CBHolderQuery{
+				TSCodes: codes[i:j],
+				Period:  period,
+				Start:   start,
+				End:     end,
+			})
+			if err != nil {
+				return total, err
+			}
+			if err := s.CB.UpsertTopHolders(ctx, rows); err != nil {
+				return total, err
+			}
+			total += int64(len(rows))
+			s.logger().Info("cb_holders upserted",
+				"batch_from", codes[i],
+				"batch_size", j-i,
+				"rows", len(rows),
+			)
+		}
+		return total, nil
+	})
 }
 
 func copyCalendar(rows []domain.TradeCalendar, exchange string) []domain.TradeCalendar {

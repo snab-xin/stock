@@ -44,7 +44,7 @@ Tushare Pro
 | `internal/applog` | slog 初始化、GORM 适配 | 业务逻辑 |
 | `internal/httpapi` | Gin 看板 API；路由分组、JSON、CORS、请求日志 | 下单 |
 | `config.yaml` | 非密钥配置（含 tushare.rpm） | Token / 数据库密码 |
-| `web/` | Vite React 质检页 | 交易终端 |
+| `web/` | Vite React 数据看板（shadcn-admin） | 交易终端 |
 | `cmd/ashare` | 子命令 | 复杂业务 |
 
 ## 为什么用 GORM（以及不用哪些功能）
@@ -53,7 +53,7 @@ Tushare Pro
 
 不用这些：
 
-- **AutoMigrate**：表结构只来自 `migrations/*.sql`
+- **AutoMigrate**：表结构只来自 `migrations/*.sql`。字段中文备注用 PostgreSQL `COMMENT ON COLUMN`，不靠 GORM tag 建表。
 - **Association / Preload**：行情是事实表，不做对象图
 - **把研究 SQL 改成链式 API**：复权、截面、回测扫描继续写 SQL 或视图
 

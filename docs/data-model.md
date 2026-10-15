@@ -85,6 +85,30 @@ hfq_price = raw_price * adj_factor / first_adj_factor
 
 `trade_date` 表示该条成分在这一天有效（按日快照或按调仓日展开均可，但要在采集层统一）。
 
+## cb_basic
+
+可转债基础信息。自然键：`ts_code`。来源 Tushare `cb_basic`（约 2000 积分）。
+
+字段备注写在迁移 `003_cb_basic_and_holders.sql` 的 `COMMENT ON COLUMN` 里。注意：`hold` 相关不在此表；条款类字段用 `TEXT`。
+
+未收录已废弃的 `maturity_put_price`（文档要求改用 `maturity_call_price`）。
+
+## cb_daily
+
+可转债日线行情。自然键：`(ts_code, trade_date)`。来源 Tushare `cb_daily`（约 2000 积分）。
+
+`volume` 单位为手，`amount` 单位为万元（与接口一致）。列表页用最新（或指定）交易日的 `close` / `change` / `pct_chg` 展示涨跌。
+
+## cb_top_holder
+
+可转债前十大持有人快照。自然键：`(ts_code, end_date, holder_rank)`。来源 Tushare `top10_cb_holders`（约 5000 积分）。
+
+| 列 | 说明 |
+|---|---|
+| end_date | 报告期（年中/年报日） |
+| hold_amount | **万张**（与接口一致，未换算） |
+| hold_ratio | 持有比例（%） |
+
 ## ingest_run
 
 采集任务流水，便于看「昨天日线有没有灌完」。
@@ -100,4 +124,7 @@ hfq_price = raw_price * adj_factor / first_adj_factor
 3. `adj_factor`
 4. `daily_bar`（含涨跌停字段）
 5. `suspension`
-6. `index_constituent`（做指数内选股时再灌）
+6. `cb_basic`（可选；可转债研究）
+7. `cb_daily`（可选；列表涨跌）
+8. `cb_top_holder`（依赖 `cb_basic` 或显式代码）
+9. `index_constituent`（做指数内选股时再灌）

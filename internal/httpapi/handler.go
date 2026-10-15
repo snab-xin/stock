@@ -19,6 +19,7 @@ type Handler struct {
 	cfg         config.Config
 	instruments *repo.InstrumentRepo
 	market      *repo.MarketRepo
+	cb          *repo.CBRepo
 	runs        *repo.IngestRunRepo
 	runner      *ingest.Runner
 }
@@ -34,6 +35,7 @@ func (h *Handler) health(c *gin.Context) {
 func (h *Handler) configInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"tushare_rpm":       h.cfg.TushareRPM,
+		"tushare_apis":      h.cfg.TushareAPIs,
 		"tushare_url":       h.cfg.TushareURL,
 		"http_addr":         h.cfg.HTTPAddr,
 		"has_tushare_token": h.cfg.TushareToken != "",

@@ -19,7 +19,7 @@
 ```
 ashare/
   cmd/ashare/           ping / migrate / ingest / show / stats / backtest / web
-  web/                  Vite + React 数据看板
+  web/                  Vite + React 数据看板（shadcn-admin 壳）
   internal/httpapi/     Gin JSON API（采集 / 回测 / 质检）
   internal/applog/      slog 日志（Gin / GORM / 采集）
   internal/tushare/     Tushare 适配（手→股、千元→元）
@@ -66,8 +66,8 @@ go run ./cmd/ashare web
 
 ```powershell
 cd web
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 打开 http://127.0.0.1:5173

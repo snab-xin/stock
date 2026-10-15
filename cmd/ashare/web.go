@@ -36,6 +36,7 @@ func cmdWeb(cfg config.Config) error {
 		slog.Info("tushare rate limit",
 			"component", "web",
 			"rpm", cfg.TushareRPM,
+			"apis", cfg.TushareAPIs,
 			"gap", cfg.MinInterval().Round(time.Millisecond).String(),
 		)
 	}
@@ -53,7 +54,7 @@ func cmdWeb(cfg config.Config) error {
 			"addr", cfg.HTTPAddr,
 			"framework", "gin",
 		)
-		fmt.Println("前端请另开终端:  cd web && npm run dev")
+		fmt.Println("前端请另开终端:  cd web && pnpm dev")
 		errCh <- srv.ListenAndServe()
 	}()
 

@@ -22,10 +22,12 @@ type Config struct {
 	HTTPAddr     string
 	TushareToken string
 	TushareURL   string
-	// TushareRPM 为每分钟最大请求次数（均匀间隔 60s/rpm）。
+	// TushareRPM 默认每分钟请求上限；未在 APIs 中配置的接口用它。
 	TushareRPM int
-	Backtest   Backtest
-	Log        Log
+	// TushareAPIs 按接口名覆盖 rpm，如 top10_cb_holders。
+	TushareAPIs map[string]int
+	Backtest    Backtest
+	Log         Log
 }
 
 type Log struct {
@@ -61,11 +63,28 @@ func DefaultBacktest() Backtest {
 	}
 }
 
+// RPMFor 返回某 Tushare 接口的每分钟上限；未配置则用默认。
+func (c Config) RPMFor(apiName string) int {
+	apiName = strings.TrimSpace(apiName)
+	if apiName != "" && c.TushareAPIs != nil {
+		if n, ok := c.TushareAPIs[apiName]; ok && n > 0 {
+			return n
+		}
+	}
+	if c.TushareRPM > 0 {
+		return c.TushareRPM
+	}
+	return DefaultTushareRPM
+}
+
 type fileConfig struct {
 	HTTPAddr string `yaml:"http_addr"`
 	Tushare  struct {
 		URL string `yaml:"url"`
-		RPM int    `yaml:"rpm"`
+		RPM struct {
+			Default int            `yaml:"default"`
+			APIs    map[string]int `yaml:"apis"`
+		} `yaml:"rpm"`
 	} `yaml:"tushare"`
 	Backtest fileBacktest `yaml:"backtest"`
 	Log      struct {
@@ -89,11 +108,12 @@ func Load() (Config, error) {
 	_ = loadDotEnv(".env")
 
 	cfg := Config{
-		HTTPAddr:   DefaultHTTPAddr,
-		TushareURL: DefaultTushareURL,
-		TushareRPM: DefaultTushareRPM,
-		Backtest:   DefaultBacktest(),
-		Log:        DefaultLog(),
+		HTTPAddr:    DefaultHTTPAddr,
+		TushareURL:  DefaultTushareURL,
+		TushareRPM:  DefaultTushareRPM,
+		TushareAPIs: map[string]int{},
+		Backtest:    DefaultBacktest(),
+		Log:         DefaultLog(),
 	}
 
 	if err := mergeYAML("config.yaml", &cfg); err != nil && !os.IsNotExist(err) {
@@ -138,6 +158,9 @@ func Load() (Config, error) {
 	if cfg.TushareRPM <= 0 {
 		cfg.TushareRPM = DefaultTushareRPM
 	}
+	if cfg.TushareAPIs == nil {
+		cfg.TushareAPIs = map[string]int{}
+	}
 	if cfg.TushareURL == "" {
 		cfg.TushareURL = DefaultTushareURL
 	}
@@ -177,8 +200,17 @@ func mergeYAML(path string, cfg *Config) error {
 	if fc.Tushare.URL != "" {
 		cfg.TushareURL = fc.Tushare.URL
 	}
-	if fc.Tushare.RPM > 0 {
-		cfg.TushareRPM = fc.Tushare.RPM
+	if fc.Tushare.RPM.Default > 0 {
+		cfg.TushareRPM = fc.Tushare.RPM.Default
+	}
+	if len(fc.Tushare.RPM.APIs) > 0 {
+		cfg.TushareAPIs = make(map[string]int, len(fc.Tushare.RPM.APIs))
+		for k, v := range fc.Tushare.RPM.APIs {
+			if strings.TrimSpace(k) == "" || v <= 0 {
+				continue
+			}
+			cfg.TushareAPIs[strings.TrimSpace(k)] = v
+		}
 	}
 	mergeBacktest(&cfg.Backtest, fc.Backtest)
 	if fc.Log.Level != "" {
@@ -244,10 +276,7 @@ func loadDotEnv(path string) error {
 	return scanner.Err()
 }
 
-// MinInterval 便于日志展示：按 RPM 换算的平均间隔。
+// MinInterval 便于日志展示：默认 rpm 换算的平均间隔。
 func (c Config) MinInterval() time.Duration {
-	if c.TushareRPM <= 0 {
-		return time.Minute / DefaultTushareRPM
-	}
-	return time.Minute / time.Duration(c.TushareRPM)
+	return time.Minute / time.Duration(c.RPMFor(""))
 }

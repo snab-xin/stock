@@ -12,8 +12,12 @@ tushare:
   # Tushare API 地址，一般不用改
   url: "https://api.tushare.pro"
   # 每分钟最大请求次数。实际按均匀间隔限流：两次请求至少隔 60s/rpm。
-  # 例如 rpm: 50 → 约每 1.2s 一次。默认 200。
-  rpm: 200
+  # 未在 apis 中出现的接口走 default。
+  rpm:
+    default: 200
+    apis:
+      # top10_cb_holders: 50
+      # cb_daily: 200
 
 backtest:
   init_cash: 100000

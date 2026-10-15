@@ -6,13 +6,16 @@ log:
 
 tushare:
   url: "https://api.tushare.pro"
-  rpm: 50
+  rpm:
+    default: 300
+    apis:
+      top10_cb_holders: 30
 
 backtest:
   init_cash: 100000
   fast: 5
   slow: 20
-  commission_rate: 0.00025
+  commission_rate: 0.0000741
   commission_min: 5
   stamp_tax_rate: 0.0005
   slippage: 0.001
