@@ -145,7 +145,7 @@ export function InspectPage() {
             {limitUp > 0 ? <Badge variant="warning">涨停 {limitUp}</Badge> : null}
             {limitDown > 0 ? <Badge variant="success">跌停 {limitDown}</Badge> : null}
             {paused > 0 ? <Badge variant="outline">停牌 {paused}</Badge> : null}
-            {gaps && gaps.missing.length > 0 ? (
+            {gaps && (gaps.missing?.length ?? 0) > 0 ? (
               <Badge variant="warning">缺日 {gaps.missing.length}</Badge>
             ) : (
               <Badge variant="success">日历对齐</Badge>
@@ -169,7 +169,7 @@ export function InspectPage() {
               <CardTitle>缺日（开市但无 K 线）</CardTitle>
             </CardHeader>
             <CardContent>
-              {!gaps || gaps.missing.length === 0 ? (
+              {!gaps || (gaps.missing?.length ?? 0) === 0 ? (
                 <p className="text-sm text-muted-foreground">当前区间没有缺日，或还没有交易日历。</p>
               ) : (
                 <div className="flex flex-wrap gap-2">

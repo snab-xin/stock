@@ -4,11 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/stock/ashare/internal/app"
+	"github.com/stock/ashare/internal/applog"
 	"github.com/stock/ashare/internal/config"
 	"github.com/stock/ashare/internal/dates"
 	"github.com/stock/ashare/internal/db"
@@ -21,17 +23,21 @@ func cmdIngest(ctx context.Context, cfg config.Config, args []string) error {
 		printIngestUsage()
 		return nil
 	}
-	gdb, err := db.Connect(ctx, cfg.DatabaseURL)
+	gdb, err := db.ConnectWithLog(ctx, cfg.DatabaseURL, applog.GormTraceLevel(cfg.Log.Level))
 	if err != nil {
 		return err
 	}
 	defer db.Close(gdb)
 
-	svc, err := app.NewIngestService(cfg, gdb, os.Stdout)
+	svc, err := app.NewIngestService(cfg, gdb)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Tushare 限流 %d 次/分钟\n", cfg.TushareRPM)
+	slog.Info("tushare rate limit",
+		"component", "ingest",
+		"rpm", cfg.TushareRPM,
+		"gap", cfg.MinInterval().Round(time.Millisecond).String(),
+	)
 
 	switch args[0] {
 	case "help", "-h", "--help":

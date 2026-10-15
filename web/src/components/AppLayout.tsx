@@ -1,10 +1,11 @@
-import { CandlestickChart, Database } from 'lucide-react'
+import { CandlestickChart, Database, LineChart } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
 const links = [
   { to: '/', label: '行情质检', icon: CandlestickChart, end: true },
   { to: '/ingest', label: '采集任务', icon: Database, end: false },
+  { to: '/backtest', label: '最小回测', icon: LineChart, end: false },
 ]
 
 export function AppLayout() {

@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
+	"github.com/stock/ashare/internal/applog"
 	"github.com/stock/ashare/internal/config"
 	"github.com/stock/ashare/internal/db"
 	"github.com/stock/ashare/migrations"
@@ -34,6 +36,9 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := applog.Init(applog.Options{Level: cfg.Log.Level, Format: cfg.Log.Format}); err != nil {
+		return err
+	}
 
 	if args[0] == "web" {
 		return cmdWeb(cfg)
@@ -42,6 +47,9 @@ func run(args []string) error {
 	timeout := 30 * time.Second
 	if args[0] == "ingest" {
 		timeout = 6 * time.Hour
+	}
+	if args[0] == "backtest" {
+		timeout = 2 * time.Minute
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -59,23 +67,25 @@ func run(args []string) error {
 		return cmdShow(ctx, cfg, args[1:])
 	case "stats":
 		return cmdStats(ctx, cfg, args[1:])
+	case "backtest":
+		return cmdBacktest(ctx, cfg, args[1:])
 	default:
 		return fmt.Errorf("未知命令 %q，使用 ashare help 查看说明", args[0])
 	}
 }
 
 func cmdPing(ctx context.Context, cfg config.Config) error {
-	gdb, err := db.Connect(ctx, cfg.DatabaseURL)
+	gdb, err := db.ConnectWithLog(ctx, cfg.DatabaseURL, applog.GormTraceLevel(cfg.Log.Level))
 	if err != nil {
 		return err
 	}
 	defer db.Close(gdb)
-	fmt.Println("PostgreSQL 连接正常")
+	slog.Info("postgresql ok", "component", "cli")
 	return nil
 }
 
 func cmdMigrate(ctx context.Context, cfg config.Config) error {
-	gdb, err := db.Connect(ctx, cfg.DatabaseURL)
+	gdb, err := db.ConnectWithLog(ctx, cfg.DatabaseURL, applog.GormTraceLevel(cfg.Log.Level))
 	if err != nil {
 		return err
 	}
@@ -83,12 +93,12 @@ func cmdMigrate(ctx context.Context, cfg config.Config) error {
 	if err := db.Migrate(ctx, gdb, migrations.FS); err != nil {
 		return err
 	}
-	fmt.Println("数据库迁移完成")
+	slog.Info("migrate done", "component", "cli")
 	return nil
 }
 
 func cmdStatus(ctx context.Context, cfg config.Config) error {
-	gdb, err := db.Connect(ctx, cfg.DatabaseURL)
+	gdb, err := db.ConnectWithLog(ctx, cfg.DatabaseURL, applog.GormTraceLevel(cfg.Log.Level))
 	if err != nil {
 		return err
 	}
@@ -134,11 +144,14 @@ func printUsage() {
   ashare ingest    从 Tushare 灌数（calendar / instruments / daily / sync）
   ashare show CODE [-start] [-end] [-qfq]
   ashare stats CODE [-start] [-end]
+  ashare backtest CODE [-start] [-end] [-fast] [-slow] [-cash] [-out]
   ashare web       启动数据看板 API（配合 web/ 前端）
   ashare help      显示帮助
 
 环境变量:
   DATABASE_URL     PostgreSQL 连接串
   TUSHARE_TOKEN    Tushare Pro token
+  LOG_LEVEL        debug|info|warn|error（默认 info）
+  LOG_FORMAT       text|json（默认 text）
 `)
 }

@@ -75,13 +75,13 @@ func (s *Source) ListDailyBars(ctx context.Context, q ingest.BarQuery) ([]domain
 	}
 
 	if limitRows, err := s.client.Query(ctx, "stk_limit", barParams(q), "ts_code,trade_date,up_limit,down_limit"); err != nil {
-		slog.Warn("stk_limit 跳过", "err", err)
+		slog.Warn("stk_limit skipped", "component", "tushare", "err", err)
 	} else {
 		applyLimits(bars, limitRows)
 	}
 
 	if basicRows, err := s.client.Query(ctx, "daily_basic", barParams(q), "ts_code,trade_date,turnover_rate"); err != nil {
-		slog.Warn("daily_basic 跳过", "err", err)
+		slog.Warn("daily_basic skipped", "component", "tushare", "err", err)
 	} else {
 		applyTurnover(bars, basicRows)
 	}

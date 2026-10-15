@@ -127,7 +127,10 @@ export function IngestPage() {
         <div>
           <h1 className="text-xl font-semibold">采集任务</h1>
           <p className="text-sm text-muted-foreground">
-            在界面同步行情。限流：{cfg ? `${cfg.tushare_rpm} 次/分钟` : '…'}
+            在界面同步行情。限流：
+            {cfg
+              ? `${cfg.tushare_rpm} 次/分钟（约每 ${(60 / cfg.tushare_rpm).toFixed(2)}s 一次）`
+              : '…'}
             {cfg && !cfg.has_tushare_token ? '（未配置 Token）' : ''}
           </p>
         </div>

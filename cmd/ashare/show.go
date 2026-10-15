@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stock/ashare/internal/applog"
 	"github.com/stock/ashare/internal/config"
 	"github.com/stock/ashare/internal/dates"
 	"github.com/stock/ashare/internal/db"
@@ -21,7 +22,7 @@ func cmdShow(ctx context.Context, cfg config.Config, args []string) error {
 	if err != nil {
 		return err
 	}
-	gdb, err := db.Connect(ctx, cfg.DatabaseURL)
+	gdb, err := db.ConnectWithLog(ctx, cfg.DatabaseURL, applog.GormTraceLevel(cfg.Log.Level))
 	if err != nil {
 		return err
 	}
@@ -66,7 +67,7 @@ func cmdStats(ctx context.Context, cfg config.Config, args []string) error {
 	if err != nil {
 		return err
 	}
-	gdb, err := db.Connect(ctx, cfg.DatabaseURL)
+	gdb, err := db.ConnectWithLog(ctx, cfg.DatabaseURL, applog.GormTraceLevel(cfg.Log.Level))
 	if err != nil {
 		return err
 	}

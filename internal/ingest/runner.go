@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stock/ashare/internal/applog"
 	"github.com/stock/ashare/internal/dates"
 )
 
@@ -105,11 +106,18 @@ func (r *Runner) Start(parent context.Context, req JobRequest) error {
 	}
 	r.mu.Unlock()
 
+	applog.With("component", "ingest").Info("job started",
+		"job", job,
+		"start", req.Start,
+		"end", req.End,
+		"codes", codes,
+	)
 	go r.run(ctx, job, start, end, codes)
 	return nil
 }
 
 func (r *Runner) run(ctx context.Context, job string, start, end time.Time, codes []string) {
+	log := applog.With("component", "ingest", "job", job)
 	var err error
 	switch job {
 	case "instruments":
@@ -147,9 +155,11 @@ func (r *Runner) run(ctx context.Context, job string, start, end time.Time, code
 	if err != nil {
 		r.status.Error = err.Error()
 		r.status.Message = "failed"
+		log.Error("job failed", "err", err)
 	} else {
 		r.status.Error = ""
 		r.status.Message = "success"
+		log.Info("job finished", "codes", len(codes))
 	}
 	r.cancel = nil
 }

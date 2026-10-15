@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -18,9 +19,10 @@ type Client struct {
 	endpoint   string
 	httpClient *http.Client
 	rpm        int
+	minGap     time.Duration
 
-	mu    sync.Mutex
-	times []time.Time
+	mu   sync.Mutex
+	last time.Time
 }
 
 func NewClient(token, endpoint string, rpm int) *Client {
@@ -36,11 +38,14 @@ func NewClient(token, endpoint string, rpm int) *Client {
 		httpClient: &http.Client{
 			Timeout: 45 * time.Second,
 		},
-		rpm: rpm,
+		rpm:    rpm,
+		minGap: time.Minute / time.Duration(rpm),
 	}
 }
 
 func (c *Client) RPM() int { return c.rpm }
+
+func (c *Client) MinGap() time.Duration { return c.minGap }
 
 type apiRequest struct {
 	APIName string            `json:"api_name"`
@@ -130,36 +135,30 @@ func (c *Client) Query(ctx context.Context, apiName string, params map[string]st
 	return nil, lastErr
 }
 
-// wait 按滑动窗口限制每分钟请求次数。
+// wait 按配置的 rpm 均匀限流：两次请求至少间隔 60s/rpm。
 func (c *Client) wait(ctx context.Context) error {
-	for {
-		c.mu.Lock()
-		now := time.Now()
-		cutoff := now.Add(-time.Minute)
-		kept := c.times[:0]
-		for _, t := range c.times {
-			if !t.Before(cutoff) {
-				kept = append(kept, t)
-			}
-		}
-		c.times = kept
+	c.mu.Lock()
+	wait := c.minGap - time.Since(c.last)
+	c.mu.Unlock()
 
-		if len(c.times) < c.rpm {
-			c.times = append(c.times, now)
-			c.mu.Unlock()
-			return nil
-		}
-		wait := time.Until(c.times[0].Add(time.Minute)) + time.Millisecond
-		c.mu.Unlock()
-		if wait < time.Millisecond {
-			wait = time.Millisecond
-		}
+	if wait > 0 {
+		slog.Debug("tushare rate limit wait",
+			"component", "tushare",
+			"wait", wait.Round(time.Millisecond).String(),
+			"rpm", c.rpm,
+			"gap", c.minGap.String(),
+		)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(wait):
 		}
 	}
+
+	c.mu.Lock()
+	c.last = time.Now()
+	c.mu.Unlock()
+	return nil
 }
 
 func truncate(s string, n int) string {

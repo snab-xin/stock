@@ -6,12 +6,18 @@ import (
 	"time"
 
 	"github.com/stock/ashare/internal/domain"
+	"gorm.io/gorm"
 )
 
 func (r *InstrumentRepo) GetByTSCode(ctx context.Context, tsCode string) (domain.Instrument, error) {
-	var it domain.Instrument
-	err := r.db.WithContext(ctx).Where("ts_code = ?", tsCode).Take(&it).Error
-	return it, err
+	var items []domain.Instrument
+	if err := r.db.WithContext(ctx).Where("ts_code = ?", tsCode).Limit(1).Find(&items).Error; err != nil {
+		return domain.Instrument{}, err
+	}
+	if len(items) == 0 {
+		return domain.Instrument{}, gorm.ErrRecordNotFound
+	}
+	return items[0], nil
 }
 
 func (r *InstrumentRepo) FindBySymbol(ctx context.Context, symbol string) ([]domain.Instrument, error) {

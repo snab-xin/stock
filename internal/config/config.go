@@ -22,8 +22,43 @@ type Config struct {
 	HTTPAddr     string
 	TushareToken string
 	TushareURL   string
-	// TushareRPM 为每分钟最大请求次数（滑动窗口）。
+	// TushareRPM 为每分钟最大请求次数（均匀间隔 60s/rpm）。
 	TushareRPM int
+	Backtest   Backtest
+	Log        Log
+}
+
+type Log struct {
+	Level  string // debug | info | warn | error
+	Format string // text | json
+}
+
+func DefaultLog() Log {
+	return Log{Level: "info", Format: "text"}
+}
+
+type Backtest struct {
+	InitCash       float64 `json:"init_cash"`
+	Fast           int     `json:"fast"`
+	Slow           int     `json:"slow"`
+	CommissionRate float64 `json:"commission_rate"`
+	CommissionMin  float64 `json:"commission_min"`
+	StampTaxRate   float64 `json:"stamp_tax_rate"`
+	Slippage       float64 `json:"slippage"`
+	LotSize        int64   `json:"lot_size"`
+}
+
+func DefaultBacktest() Backtest {
+	return Backtest{
+		InitCash:       100_000,
+		Fast:           5,
+		Slow:           20,
+		CommissionRate: 0.00025,
+		CommissionMin:  5,
+		StampTaxRate:   0.0005,
+		Slippage:       0.001,
+		LotSize:        100,
+	}
 }
 
 type fileConfig struct {
@@ -32,6 +67,22 @@ type fileConfig struct {
 		URL string `yaml:"url"`
 		RPM int    `yaml:"rpm"`
 	} `yaml:"tushare"`
+	Backtest fileBacktest `yaml:"backtest"`
+	Log      struct {
+		Level  string `yaml:"level"`
+		Format string `yaml:"format"`
+	} `yaml:"log"`
+}
+
+type fileBacktest struct {
+	InitCash       float64 `yaml:"init_cash"`
+	Fast           int     `yaml:"fast"`
+	Slow           int     `yaml:"slow"`
+	CommissionRate float64 `yaml:"commission_rate"`
+	CommissionMin  float64 `yaml:"commission_min"`
+	StampTaxRate   float64 `yaml:"stamp_tax_rate"`
+	Slippage       float64 `yaml:"slippage"`
+	LotSize        int64   `yaml:"lot_size"`
 }
 
 func Load() (Config, error) {
@@ -41,6 +92,8 @@ func Load() (Config, error) {
 		HTTPAddr:   DefaultHTTPAddr,
 		TushareURL: DefaultTushareURL,
 		TushareRPM: DefaultTushareRPM,
+		Backtest:   DefaultBacktest(),
+		Log:        DefaultLog(),
 	}
 
 	if err := mergeYAML("config.yaml", &cfg); err != nil && !os.IsNotExist(err) {
@@ -91,6 +144,18 @@ func Load() (Config, error) {
 	if cfg.HTTPAddr == "" {
 		cfg.HTTPAddr = DefaultHTTPAddr
 	}
+	if v := os.Getenv("LOG_LEVEL"); v != "" {
+		cfg.Log.Level = v
+	}
+	if v := os.Getenv("LOG_FORMAT"); v != "" {
+		cfg.Log.Format = v
+	}
+	if cfg.Log.Level == "" {
+		cfg.Log.Level = DefaultLog().Level
+	}
+	if cfg.Log.Format == "" {
+		cfg.Log.Format = DefaultLog().Format
+	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL 不能为空")
 	}
@@ -115,7 +180,41 @@ func mergeYAML(path string, cfg *Config) error {
 	if fc.Tushare.RPM > 0 {
 		cfg.TushareRPM = fc.Tushare.RPM
 	}
+	mergeBacktest(&cfg.Backtest, fc.Backtest)
+	if fc.Log.Level != "" {
+		cfg.Log.Level = fc.Log.Level
+	}
+	if fc.Log.Format != "" {
+		cfg.Log.Format = fc.Log.Format
+	}
 	return nil
+}
+
+func mergeBacktest(dst *Backtest, src fileBacktest) {
+	if src.InitCash > 0 {
+		dst.InitCash = src.InitCash
+	}
+	if src.Fast > 0 {
+		dst.Fast = src.Fast
+	}
+	if src.Slow > 0 {
+		dst.Slow = src.Slow
+	}
+	if src.CommissionRate > 0 {
+		dst.CommissionRate = src.CommissionRate
+	}
+	if src.CommissionMin > 0 {
+		dst.CommissionMin = src.CommissionMin
+	}
+	if src.StampTaxRate > 0 {
+		dst.StampTaxRate = src.StampTaxRate
+	}
+	if src.Slippage > 0 {
+		dst.Slippage = src.Slippage
+	}
+	if src.LotSize > 0 {
+		dst.LotSize = src.LotSize
+	}
 }
 
 func loadDotEnv(path string) error {

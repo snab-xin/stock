@@ -2,7 +2,7 @@
 
 个人 A 股量化系统：Go 负责采集、存储和后续回测/执行，PostgreSQL 存行情与主数据。
 
-当前已打通 **Tushare → 日线库 → 命令行查看/统计 → 数据看板（web/）**。策略回测和实盘还没有做。
+当前已打通 **Tushare → 日线库 → 命令行/看板质检 → 单票最小回测**。组合、模拟盘和实盘还没有做。
 
 ## 能做什么
 
@@ -18,12 +18,14 @@
 
 ```
 ashare/
-  cmd/ashare/           ping / migrate / ingest / show / stats / web
+  cmd/ashare/           ping / migrate / ingest / show / stats / backtest / web
   web/                  Vite + React 数据看板
-  internal/httpapi/     看板 JSON API
+  internal/httpapi/     Gin JSON API（采集 / 回测 / 质检）
+  internal/applog/      slog 日志（Gin / GORM / 采集）
   internal/tushare/     Tushare 适配（手→股、千元→元）
   internal/ingest/      采集编排
   internal/research/    简单绩效
+  internal/backtest/    单票双均线回测
   internal/repo/        GORM 仓储
   migrations/           SQL 迁移
   docs/
@@ -53,6 +55,7 @@ go run ./cmd/ashare ingest instruments
 go run ./cmd/ashare ingest daily -start 20260101 -end 20261013 -code 000001.SZ
 go run ./cmd/ashare show 000001.SZ -qfq
 go run ./cmd/ashare stats 000001.SZ
+go run ./cmd/ashare backtest 000001.SZ -start 20260101 -end 20261013
 ```
 
 数据看板（两个终端）：
@@ -86,8 +89,10 @@ go run ./cmd/ashare status
 
 字段说明见 [docs/data-model.md](docs/data-model.md)，模块边界见 [docs/architecture.md](docs/architecture.md)。
 
+回测约定见 [docs/backtest.md](docs/backtest.md)。
+
 ## 下一步
 
-1. 最小回测：T 日信号、T+1 成交、佣金印花税、涨跌停无法成交
+1. 组合与风控（指数成分、仓位上限）
 2. 模拟盘
-3. 实盘
+3. 实盘（默认关闭，需明确要求）

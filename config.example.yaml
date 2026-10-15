@@ -2,8 +2,26 @@
 
 http_addr: "127.0.0.1:8080"
 
+log:
+  # debug | info | warn | error。debug 会打 GORM SQL 与 Tushare 限流等待。
+  level: info
+  # text | json。本地开发用 text，以后落盘/收集用 json。
+  format: text
+
 tushare:
   # Tushare API 地址，一般不用改
   url: "https://api.tushare.pro"
-  # 每分钟最大请求次数（滑动窗口）。默认 200，可按积分档位调低/调高。
+  # 每分钟最大请求次数。实际按均匀间隔限流：两次请求至少隔 60s/rpm。
+  # 例如 rpm: 50 → 约每 1.2s 一次。默认 200。
   rpm: 200
+
+backtest:
+  init_cash: 100000
+  fast: 5
+  slow: 20
+  # 佣金万一有万 2.5，不足 5 元按 5 元；印花税仅卖出。
+  commission_rate: 0.00025
+  commission_min: 5
+  stamp_tax_rate: 0.0005
+  slippage: 0.001
+  lot_size: 100

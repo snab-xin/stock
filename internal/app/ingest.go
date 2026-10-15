@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/stock/ashare/internal/config"
 	"github.com/stock/ashare/internal/ingest"
@@ -11,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewIngestService(cfg config.Config, gdb *gorm.DB, out io.Writer) (*ingest.Service, error) {
+func NewIngestService(cfg config.Config, gdb *gorm.DB) (*ingest.Service, error) {
 	if cfg.TushareToken == "" {
 		return nil, fmt.Errorf("未配置 TUSHARE_TOKEN，请在 .env 中填写 Tushare Pro token")
 	}
@@ -21,6 +20,5 @@ func NewIngestService(cfg config.Config, gdb *gorm.DB, out io.Writer) (*ingest.S
 		Instruments: repo.NewInstrumentRepo(gdb),
 		Market:      repo.NewMarketRepo(gdb),
 		Runs:        repo.NewIngestRunRepo(gdb),
-		Out:         out,
 	}, nil
 }

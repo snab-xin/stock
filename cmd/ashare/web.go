@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stock/ashare/internal/app"
+	"github.com/stock/ashare/internal/applog"
 	"github.com/stock/ashare/internal/config"
 	"github.com/stock/ashare/internal/db"
 	"github.com/stock/ashare/internal/httpapi"
@@ -20,18 +22,22 @@ func cmdWeb(cfg config.Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	gdb, err := db.Connect(ctx, cfg.DatabaseURL)
+	gdb, err := db.ConnectWithLog(ctx, cfg.DatabaseURL, applog.GormTraceLevel(cfg.Log.Level))
 	if err != nil {
 		return err
 	}
 	defer db.Close(gdb)
 
 	var runner *ingest.Runner
-	if svc, err := app.NewIngestService(cfg, gdb, os.Stdout); err != nil {
-		fmt.Printf("采集 API 未启用: %v\n", err)
+	if svc, err := app.NewIngestService(cfg, gdb); err != nil {
+		slog.Warn("ingest API disabled", "component", "web", "err", err)
 	} else {
 		runner = ingest.NewRunner(svc)
-		fmt.Printf("Tushare 限流 %d 次/分钟\n", cfg.TushareRPM)
+		slog.Info("tushare rate limit",
+			"component", "web",
+			"rpm", cfg.TushareRPM,
+			"gap", cfg.MinInterval().Round(time.Millisecond).String(),
+		)
 	}
 
 	srv := &http.Server{
@@ -42,13 +48,18 @@ func cmdWeb(cfg config.Config) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		fmt.Printf("API  http://%s\n", cfg.HTTPAddr)
+		slog.Info("api listening",
+			"component", "web",
+			"addr", cfg.HTTPAddr,
+			"framework", "gin",
+		)
 		fmt.Println("前端请另开终端:  cd web && npm run dev")
 		errCh <- srv.ListenAndServe()
 	}()
 
 	select {
 	case <-ctx.Done():
+		slog.Info("api shutting down", "component", "web")
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		return srv.Shutdown(shutCtx)

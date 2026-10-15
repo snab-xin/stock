@@ -25,7 +25,7 @@ Tushare Pro
    ├─ 原始层: instrument / daily_bar / adj_factor / suspension / trade_calendar
    └─ 研究层: daily_bar_qfq（视图，可重建）
         │
-        ├── 回测引擎（未实现）
+        ├── 回测引擎（单票双均线，T+1 / 费用 / 涨跌停）
         └── 策略作业 → 目标仓位 → 执行/风控（未实现）
 ```
 
@@ -40,7 +40,9 @@ Tushare Pro
 | `internal/ingest` | 采集编排、代码解析 | 表结构、HTTP |
 | `internal/tushare` | Tushare HTTP 与单位换算 | 落库 |
 | `internal/research` | 收益/回撤等只读统计 | 下单 |
-| `internal/httpapi` | 看板 JSON；可 POST 触发异步采集 | 下单 |
+| `internal/backtest` | 单票撮合：信号与成交分开 | 组合、实盘 |
+| `internal/applog` | slog 初始化、GORM 适配 | 业务逻辑 |
+| `internal/httpapi` | Gin 看板 API；路由分组、JSON、CORS、请求日志 | 下单 |
 | `config.yaml` | 非密钥配置（含 tushare.rpm） | Token / 数据库密码 |
 | `web/` | Vite React 质检页 | 交易终端 |
 | `cmd/ashare` | 子命令 | 复杂业务 |
@@ -69,16 +71,30 @@ A 股日线数据量不大，MySQL 也能存。选 PostgreSQL 是为了：
 
 应用层目前用 `float64` 接价格，方便研究迭代；库内仍是 `NUMERIC`。若以后对账或净值计算出现误差，再改为 `shopspring/decimal`。
 
-## 回测尚未实现时的边界
+## 回测边界
 
-回测引擎以后按交易日推进：
+日线回测按已落库的交易日推进，细节见 [backtest.md](backtest.md)：
 
-1. 用 `trade_calendar` 取下一个开市日
-2. 用 T 日（或更早）已落库数据生成信号，禁止读到未来 K 线
-3. T+1 开盘或收盘撮合；涨跌停、停牌则不成交
-4. 扣除佣金、印花税、滑点后再记账
+1. 信号只用 T 日及更早的前复权收盘，禁止读到未来 K 线
+2. T+1 未复权开盘撮合；涨跌停、停牌则不成交
+3. 扣除佣金、印花税、滑点后再记账
+4. 未覆盖的规则写进每次结果的 `limitations`，不假装已经模拟
 
-信号计算和撮合必须分开，避免把「看见当天收盘再以当天收盘买入」写进第一版策略。
+信号计算和撮合必须分开，避免把「看见当天收盘再以当天收盘买入」写进策略。
+
+## HTTP API
+
+看板接口用 **Gin**，仍由 `net/http.Server` 托管以便优雅退出。Tushare 出站请求继续用标准库 HTTP 客户端，不经过 Gin。
+
+选型理由：路由分组、JSON 绑定、Recovery/CORS 中间件后面都会用到；标准库 `ServeMux` 写到回测这一步已经开始散。不选 Fiber，避免和 `net/http` 生态分叉。
+
+## 日志
+
+统一用标准库 **slog**（`internal/applog`）：
+
+- `config.yaml` 的 `log.level` / `log.format`，可用环境变量 `LOG_LEVEL` / `LOG_FORMAT` 覆盖
+- Gin 记请求（health 走 debug）；GORM 默认只记慢查询和错误，`debug` 级别才打每条 SQL
+- 采集进度、限流等待、任务起停走结构化字段；`show` / `backtest` 等人读表格仍用 `fmt`
 
 ## 配置与密钥
 

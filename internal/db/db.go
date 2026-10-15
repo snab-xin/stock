@@ -3,20 +3,25 @@ package db
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
+	"github.com/stock/ashare/internal/applog"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 )
 
 func Connect(ctx context.Context, databaseURL string) (*gorm.DB, error) {
+	return ConnectWithLog(ctx, databaseURL, slog.LevelWarn)
+}
+
+func ConnectWithLog(ctx context.Context, databaseURL string, logLevel slog.Level) (*gorm.DB, error) {
 	gdb, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: true,
 		},
-		Logger: logger.Default.LogMode(logger.Warn),
+		Logger: applog.NewGormLogger(logLevel),
 		NowFunc: func() time.Time {
 			return time.Now()
 		},

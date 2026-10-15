@@ -62,6 +62,75 @@ export type AppConfig = {
   tushare_url: string
   http_addr: string
   has_tushare_token: boolean
+  backtest?: BacktestDefaults
+  log?: { level: string; format: string }
+}
+
+export type BacktestDefaults = {
+  init_cash: number
+  fast: number
+  slow: number
+  commission_rate: number
+  commission_min: number
+  stamp_tax_rate: number
+  slippage: number
+  lot_size: number
+}
+
+export type BacktestRequest = {
+  code: string
+  start?: string
+  end?: string
+  fast?: number
+  slow?: number
+  cash?: number
+}
+
+export type BacktestTrade = {
+  date: string
+  side: string
+  price: number
+  shares: number
+  amount: number
+  commission: number
+  stamp_tax: number
+  slippage: number
+  cash_after: number
+  reason: string
+}
+
+export type EquityPoint = {
+  date: string
+  cash: number
+  shares: number
+  close: number
+  equity: number
+  target: number
+}
+
+export type BacktestResult = {
+  code: string
+  name?: string
+  strategy: string
+  fast: number
+  slow: number
+  init_cash: number
+  end_equity: number
+  total_return: number
+  max_drawdown: number
+  ann_return: number
+  buy_hold_return: number
+  trade_count: number
+  win_rate: number
+  commission: number
+  stamp_tax: number
+  slippage_cost: number
+  bar_count: number
+  start: string
+  end: string
+  trades: BacktestTrade[]
+  equity: EquityPoint[]
+  limitations: string[]
 }
 
 export type StartIngestRequest = {
@@ -125,4 +194,8 @@ export function startIngest(req: StartIngestRequest) {
 
 export function fetchAppConfig() {
   return getJSON<AppConfig>('/api/config')
+}
+
+export function runBacktest(req: BacktestRequest) {
+  return postJSON<BacktestResult>('/api/backtest', req)
 }

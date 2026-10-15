@@ -3,9 +3,10 @@ package ingest
 import (
 	"context"
 	"fmt"
-	"io"
+	"log/slog"
 	"time"
 
+	"github.com/stock/ashare/internal/applog"
 	"github.com/stock/ashare/internal/dates"
 	"github.com/stock/ashare/internal/domain"
 	"github.com/stock/ashare/internal/repo"
@@ -16,14 +17,15 @@ type Service struct {
 	Instruments *repo.InstrumentRepo
 	Market      *repo.MarketRepo
 	Runs        *repo.IngestRunRepo
-	Out         io.Writer
+	log         *slog.Logger
 }
 
-func (s *Service) printf(format string, args ...any) {
-	if s.Out == nil {
-		return
+func (s *Service) logger() *slog.Logger {
+	if s.log != nil {
+		return s.log
 	}
-	_, _ = fmt.Fprintf(s.Out, format, args...)
+	s.log = applog.With("component", "ingest")
+	return s.log
 }
 
 func (s *Service) withRun(ctx context.Context, job string, fn func() (int64, error)) error {
@@ -51,7 +53,7 @@ func (s *Service) SyncInstruments(ctx context.Context) error {
 		if err := s.Instruments.Upsert(ctx, items); err != nil {
 			return 0, err
 		}
-		s.printf("instruments %d 条\n", len(items))
+		s.logger().Info("instruments upserted", "rows", len(items))
 		return int64(len(items)), nil
 	})
 }
@@ -68,7 +70,7 @@ func (s *Service) SyncCalendar(ctx context.Context, start, end time.Time) error 
 			if err := s.Market.UpsertCalendar(ctx, rows); err != nil {
 				return total, err
 			}
-			s.printf("calendar %s %d 条\n", ex, len(rows))
+			s.logger().Info("calendar upserted", "exchange", ex, "rows", len(rows))
 			total += int64(len(rows))
 			if ex == "SSE" {
 				sse = rows
@@ -79,7 +81,7 @@ func (s *Service) SyncCalendar(ctx context.Context, start, end time.Time) error 
 			if err := s.Market.UpsertCalendar(ctx, bse); err != nil {
 				return total, err
 			}
-			s.printf("calendar BSE %d 条（复制自 SSE）\n", len(bse))
+			s.logger().Info("calendar upserted", "exchange", "BSE", "rows", len(bse), "copied_from", "SSE")
 			total += int64(len(bse))
 		}
 		return total, nil
@@ -117,7 +119,7 @@ func (s *Service) SyncDaily(ctx context.Context, start, end time.Time, codes []s
 
 		susp, err := s.Source.ListSuspensions(ctx, BarQuery{Start: start, End: end})
 		if err != nil {
-			s.printf("停牌数据跳过: %v\n", err)
+			s.logger().Warn("suspension skipped", "err", err)
 			susp = nil
 		} else if err := s.Market.UpsertSuspensions(ctx, susp); err != nil {
 			return 0, err
@@ -140,7 +142,11 @@ func (s *Service) SyncDaily(ctx context.Context, start, end time.Time, codes []s
 			if err := s.Market.UpsertAdjFactors(ctx, adjs); err != nil {
 				return total, err
 			}
-			s.printf("%s  bars=%d adj=%d\n", dates.ISO(d), len(bars), len(adjs))
+			s.logger().Info("daily upserted",
+				"trade_date", dates.ISO(d),
+				"bars", len(bars),
+				"adj", len(adjs),
+			)
 			total += int64(len(bars) + len(adjs))
 		}
 		return total, nil
@@ -180,7 +186,11 @@ func (s *Service) syncCodeRange(ctx context.Context, code string, start, end tim
 	if err := s.Market.UpsertAdjFactors(ctx, adjs); err != nil {
 		return 0, err
 	}
-	s.printf("%s  bars=%d adj=%d\n", code, len(bars), len(adjs))
+	s.logger().Info("daily upserted",
+		"ts_code", code,
+		"bars", len(bars),
+		"adj", len(adjs),
+	)
 	return int64(len(bars) + len(adjs)), nil
 }
 
