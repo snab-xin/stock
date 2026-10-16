@@ -16,6 +16,8 @@ import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
 import { Route as errors403RouteImport } from './routes/(errors)/403'
 import { Route as errors401RouteImport } from './routes/(errors)/401'
+import { Route as AuthenticatedStocksIndexRouteImport } from './routes/_authenticated/stocks/index'
+import { Route as AuthenticatedNotesIndexRouteImport } from './routes/_authenticated/notes/index'
 import { Route as AuthenticatedIngestIndexRouteImport } from './routes/_authenticated/ingest/index'
 import { Route as AuthenticatedCbIndexRouteImport } from './routes/_authenticated/cb/index'
 import { Route as AuthenticatedBacktestIndexRouteImport } from './routes/_authenticated/backtest/index'
@@ -55,6 +57,17 @@ const errors401Route = errors401RouteImport.update({
   id: '/(errors)/401',
   path: '/401',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedStocksIndexRoute =
+  AuthenticatedStocksIndexRouteImport.update({
+    id: '/stocks/',
+    path: '/stocks/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedNotesIndexRoute = AuthenticatedNotesIndexRouteImport.update({
+  id: '/notes/',
+  path: '/notes/',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedIngestIndexRoute =
   AuthenticatedIngestIndexRouteImport.update({
@@ -97,6 +110,8 @@ export interface FileRoutesByFullPath {
   '/backtest/': typeof AuthenticatedBacktestIndexRoute
   '/cb/': typeof AuthenticatedCbIndexRoute
   '/ingest/': typeof AuthenticatedIngestIndexRoute
+  '/notes/': typeof AuthenticatedNotesIndexRoute
+  '/stocks/': typeof AuthenticatedStocksIndexRoute
 }
 export interface FileRoutesByTo {
   '/401': typeof errors401Route
@@ -110,6 +125,8 @@ export interface FileRoutesByTo {
   '/backtest': typeof AuthenticatedBacktestIndexRoute
   '/cb': typeof AuthenticatedCbIndexRoute
   '/ingest': typeof AuthenticatedIngestIndexRoute
+  '/notes': typeof AuthenticatedNotesIndexRoute
+  '/stocks': typeof AuthenticatedStocksIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,6 +142,8 @@ export interface FileRoutesById {
   '/_authenticated/backtest/': typeof AuthenticatedBacktestIndexRoute
   '/_authenticated/cb/': typeof AuthenticatedCbIndexRoute
   '/_authenticated/ingest/': typeof AuthenticatedIngestIndexRoute
+  '/_authenticated/notes/': typeof AuthenticatedNotesIndexRoute
+  '/_authenticated/stocks/': typeof AuthenticatedStocksIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -140,6 +159,8 @@ export interface FileRouteTypes {
     | '/backtest/'
     | '/cb/'
     | '/ingest/'
+    | '/notes/'
+    | '/stocks/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/401'
@@ -153,6 +174,8 @@ export interface FileRouteTypes {
     | '/backtest'
     | '/cb'
     | '/ingest'
+    | '/notes'
+    | '/stocks'
   id:
     | '__root__'
     | '/_authenticated'
@@ -167,6 +190,8 @@ export interface FileRouteTypes {
     | '/_authenticated/backtest/'
     | '/_authenticated/cb/'
     | '/_authenticated/ingest/'
+    | '/_authenticated/notes/'
+    | '/_authenticated/stocks/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -229,6 +254,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof errors401RouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/stocks/': {
+      id: '/_authenticated/stocks/'
+      path: '/stocks'
+      fullPath: '/stocks/'
+      preLoaderRoute: typeof AuthenticatedStocksIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/notes/': {
+      id: '/_authenticated/notes/'
+      path: '/notes'
+      fullPath: '/notes/'
+      preLoaderRoute: typeof AuthenticatedNotesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/ingest/': {
       id: '/_authenticated/ingest/'
       path: '/ingest'
@@ -274,6 +313,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBacktestIndexRoute: typeof AuthenticatedBacktestIndexRoute
   AuthenticatedCbIndexRoute: typeof AuthenticatedCbIndexRoute
   AuthenticatedIngestIndexRoute: typeof AuthenticatedIngestIndexRoute
+  AuthenticatedNotesIndexRoute: typeof AuthenticatedNotesIndexRoute
+  AuthenticatedStocksIndexRoute: typeof AuthenticatedStocksIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -283,6 +324,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBacktestIndexRoute: AuthenticatedBacktestIndexRoute,
   AuthenticatedCbIndexRoute: AuthenticatedCbIndexRoute,
   AuthenticatedIngestIndexRoute: AuthenticatedIngestIndexRoute,
+  AuthenticatedNotesIndexRoute: AuthenticatedNotesIndexRoute,
+  AuthenticatedStocksIndexRoute: AuthenticatedStocksIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

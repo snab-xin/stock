@@ -21,11 +21,11 @@ func LoadAndRun(ctx context.Context, instruments *repo.InstrumentRepo, market *r
 		fetchStart = p.TradeFrom.AddDate(0, 0, -(p.Slow*3 + 20))
 	}
 
-	raw, err := market.ListDailyBars(ctx, code, fetchStart, p.TradeTo, 0, false)
+	raw, err := market.ListDailyBars(ctx, code, fetchStart, p.TradeTo, 0, false, repo.PeriodDay)
 	if err != nil {
 		return Result{}, err
 	}
-	qfq, err := market.ListDailyBars(ctx, code, fetchStart, p.TradeTo, 0, true)
+	qfq, err := market.ListDailyBars(ctx, code, fetchStart, p.TradeTo, 0, true, repo.PeriodDay)
 	if err != nil {
 		return Result{}, err
 	}

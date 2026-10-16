@@ -27,7 +27,10 @@ type cbListItemDTO struct {
 	CouponRate        *float64 `json:"coupon_rate,omitempty"`
 	IssueRating       string   `json:"issue_rating,omitempty"`
 	NewestRating      string   `json:"newest_rating,omitempty"`
-	RemainSize        *float64 `json:"remain_size,omitempty"`
+	IssueSize         *float64 `json:"issue_size,omitempty"`  // 初始规模（元）
+	RemainSize        *float64 `json:"remain_size,omitempty"` // 剩余规模（元）
+	FloatSize         *float64 `json:"float_size,omitempty"`  // 流通规模（元）
+	Top10Ratio        *float64 `json:"top10_ratio,omitempty"` // 最近一期十大合计占比 %
 	QuoteDate         string   `json:"quote_date,omitempty"`
 	PreClose          *float64 `json:"pre_close,omitempty"`
 	Close             *float64 `json:"close,omitempty"`
@@ -365,7 +368,10 @@ func toCBListRowDTO(it repo.CBListRow) cbListItemDTO {
 		CouponRate:        it.CouponRate,
 		IssueRating:       it.IssueRating,
 		NewestRating:      it.NewestRating,
+		IssueSize:         it.IssueSize,
 		RemainSize:        it.RemainSize,
+		FloatSize:         it.FloatSize,
+		Top10Ratio:        it.Top10Ratio,
 		PreClose:          it.PreClose,
 		Close:             it.Close,
 		Change:            it.Change,

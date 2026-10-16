@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, getRouteApi } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -17,10 +17,8 @@ import {
   type CBDetailResponse,
   type CBNeighborsResponse,
 } from '@/lib/api'
-import { resolveCBListSearch, toCBListSearchParams } from './list-search'
+import { resolveCBListSearch, toCBListSearchParams, type CBListSearch } from './list-search'
 import { parseHoldersPaste, type ParsedHolders } from './parse-holders'
-
-const routeApi = getRouteApi('/_authenticated/cb/$code')
 
 function fmtNum(n: number | null | undefined, digits = 2) {
   if (n == null || Number.isNaN(n)) return '—'
@@ -41,9 +39,15 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
-export function CBDetail() {
-  const { code } = routeApi.useParams()
-  const search = routeApi.useSearch()
+export function CBDetail({
+  code,
+  search,
+  onTitle,
+}: {
+  code: string
+  search: CBListSearch
+  onTitle?: (title: string) => void
+}) {
   const listQuery = resolveCBListSearch(search)
   const listSearch = toCBListSearchParams({
     q: listQuery.q,
@@ -153,6 +157,11 @@ export function CBDetail() {
   }, [data])
 
   const b = data?.basic
+  const tabTitle = b ? `${b.ts_code} ${b.bond_short_name || ''}`.trim() : code
+
+  useEffect(() => {
+    onTitle?.(tabTitle)
+  }, [onTitle, tabTitle])
 
   return (
     <>

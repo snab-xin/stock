@@ -3,6 +3,7 @@ import { getCookie } from '@/lib/cookies'
 import { cn } from '@/lib/utils'
 import { LayoutProvider } from '@/context/layout-provider'
 import { SearchProvider } from '@/context/search-provider'
+import { WorkspaceHost } from '@/features/workspace/tabs'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { SkipToMain } from '@/components/skip-to-main'
@@ -30,10 +31,10 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
 
               // If layout is fixed and sidebar is inset,
               // set the height to 100svh - spacing (total margins) to prevent overflow
-              'peer-data-[variant=inset]:has-data-[layout=fixed]:h-[calc(100svh-(var(--spacing)*4))]'
+              'h-svh overflow-hidden',
             )}
           >
-            {children ?? <Outlet />}
+            <WorkspaceHost>{children ?? <Outlet />}</WorkspaceHost>
           </SidebarInset>
         </SidebarProvider>
       </LayoutProvider>

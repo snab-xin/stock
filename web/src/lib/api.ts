@@ -22,10 +22,22 @@ export type Bar = {
   low_limit: number | null
 }
 
+export type BarIndicators = {
+  rsi: (number | null)[]
+  macd_dif: (number | null)[]
+  macd_dea: (number | null)[]
+  macd_hist: (number | null)[]
+}
+
+export type BarPeriod = 'day' | 'week' | 'month'
+
 export type BarsResponse = {
   instrument: Instrument
   qfq: boolean
+  period?: BarPeriod
   bars: Bar[]
+  indicators?: BarIndicators
+  has_more?: boolean
 }
 
 export type GapsResponse = {
@@ -155,7 +167,7 @@ async function parseError(res: Response): Promise<string> {
 }
 
 async function getJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url)
+  const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new Error(await parseError(res))
   return (await res.json()) as T
 }
@@ -163,6 +175,7 @@ async function getJSON<T>(url: string): Promise<T> {
 async function postJSON<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -173,6 +186,7 @@ async function postJSON<T>(url: string, body: unknown): Promise<T> {
 async function putJSON<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'PUT',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -180,13 +194,192 @@ async function putJSON<T>(url: string, body: unknown): Promise<T> {
   return (await res.json()) as T
 }
 
+async function deleteJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url, { method: 'DELETE', credentials: 'include' })
+  if (!res.ok) throw new Error(await parseError(res))
+  return (await res.json()) as T
+}
+
+export type AuthUser = {
+  id: number
+  username: string
+  role: string
+  status: string
+}
+
+export type AuthStatus = {
+  needs_setup: boolean
+  user: AuthUser | null
+}
+
+export function fetchAuthStatus() {
+  return getJSON<AuthStatus>('/api/auth/status')
+}
+
+export function registerUser(username: string, password: string) {
+  return postJSON<{ user: AuthUser }>('/api/auth/register', { username, password })
+}
+
+export function loginUser(username: string, password: string) {
+  return postJSON<{ user: AuthUser }>('/api/auth/login', { username, password })
+}
+
+export function logoutUser() {
+  return postJSON<{ ok: boolean }>('/api/auth/logout', {})
+}
+
+export type NoteTargetType = '' | 'stock' | 'cb' | 'index'
+
+export type NoteItem = {
+  id: number
+  ts_code: string
+  target_type: NoteTargetType
+  trade_date: string
+  summary: string
+  content?: string
+  updated_at?: string
+}
+
+export type NoteMark = {
+  id: number
+  trade_date: string
+  summary: string
+}
+
+export function fetchNotes(params?: { ts_code?: string; target_type?: string }) {
+  const qs = new URLSearchParams()
+  if (params?.ts_code) qs.set('ts_code', params.ts_code)
+  if (params?.target_type) qs.set('target_type', params.target_type)
+  const suffix = qs.toString() ? `?${qs}` : ''
+  return getJSON<{ items: NoteItem[] }>(`/api/notes${suffix}`)
+}
+
+export function fetchNoteMarks(tsCode: string) {
+  return getJSON<{ items: NoteMark[] }>(
+    `/api/notes/marks?ts_code=${encodeURIComponent(tsCode)}`,
+  )
+}
+
+export function fetchNote(id: number) {
+  return getJSON<NoteItem>(`/api/notes/${id}`)
+}
+
+export function createNote(body: {
+  ts_code?: string
+  target_type?: string
+  trade_date: string
+  summary: string
+  content: string
+}) {
+  return postJSON<NoteItem>('/api/notes', body)
+}
+
+export function updateNote(
+  id: number,
+  body: {
+    ts_code?: string
+    target_type?: string
+    trade_date: string
+    summary: string
+    content: string
+  },
+) {
+  return putJSON<NoteItem>(`/api/notes/${id}`, body)
+}
+
+export function deleteNote(id: number) {
+  return deleteJSON<{ ok: boolean }>(`/api/notes/${id}`)
+}
+
 export function searchInstruments(q: string) {
   return getJSON<Instrument[]>(`/api/instruments?q=${encodeURIComponent(q)}`)
 }
 
-export function fetchBars(code: string, qfq: boolean) {
+export type StockListItem = {
+  ts_code: string
+  symbol: string
+  name: string
+  exchange: string
+  is_st: boolean
+  status: string
+  list_date?: string
+  delist_date?: string
+  quote_date?: string
+  pre_close?: number | null
+  close?: number | null
+  change?: number | null
+  pct_chg?: number | null
+  volume?: number | null
+  amount?: number | null
+  is_limit_up?: boolean | null
+  is_limit_down?: boolean | null
+  is_paused?: boolean | null
+}
+
+export type StockListResponse = {
+  total: number
+  items: StockListItem[]
+}
+
+export function fetchStockList(params: {
+  q?: string
+  limit?: number
+  offset?: number
+  listedOnly?: boolean
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+}) {
+  const qs = new URLSearchParams()
+  if (params.q) qs.set('q', params.q)
+  if (params.limit != null) qs.set('limit', String(params.limit))
+  if (params.offset != null) qs.set('offset', String(params.offset))
+  if (params.listedOnly) qs.set('listed_only', '1')
+  if (params.sortBy) qs.set('sort_by', params.sortBy)
+  if (params.sortDir) qs.set('sort_dir', params.sortDir)
+  return getJSON<StockListResponse>(`/api/stocks?${qs}`)
+}
+
+export type StockNeighborsResponse = {
+  prev: string
+  next: string
+  index: number
+  total: number
+}
+
+export function fetchStockNeighbors(
+  code: string,
+  params: {
+    q?: string
+    listedOnly?: boolean
+    sortBy?: string
+    sortDir?: 'asc' | 'desc'
+  },
+) {
+  const qs = new URLSearchParams()
+  if (params.q) qs.set('q', params.q)
+  if (params.listedOnly) qs.set('listed_only', '1')
+  if (params.sortBy) qs.set('sort_by', params.sortBy)
+  if (params.sortDir) qs.set('sort_dir', params.sortDir)
+  const suffix = qs.toString() ? `?${qs}` : ''
+  return getJSON<StockNeighborsResponse>(
+    `/api/stocks/${encodeURIComponent(code)}/neighbors${suffix}`,
+  )
+}
+
+export function fetchBars(
+  code: string,
+  qfq: boolean,
+  opts?: { before?: string; limit?: number; period?: BarPeriod },
+) {
   const qs = new URLSearchParams({ code, qfq: qfq ? '1' : '0' })
+  if (opts?.before) qs.set('before', opts.before)
+  if (opts?.limit != null) qs.set('limit', String(opts.limit))
+  if (opts?.period && opts.period !== 'day') qs.set('period', opts.period)
   return getJSON<BarsResponse>(`/api/bars?${qs}`)
+}
+
+export function fetchIndicators(closes: number[]) {
+  return postJSON<BarIndicators>('/api/indicators', { closes })
 }
 
 export function fetchGaps(code: string) {
@@ -227,7 +420,10 @@ export type CBListItem = {
   coupon_rate?: number | null
   issue_rating?: string
   newest_rating?: string
+  issue_size?: number | null
   remain_size?: number | null
+  float_size?: number | null
+  top10_ratio?: number | null
   quote_date?: string
   pre_close?: number | null
   close?: number | null

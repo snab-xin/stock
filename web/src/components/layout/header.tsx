@@ -12,15 +12,18 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
   const [offset, setOffset] = useState(0)
 
   useEffect(() => {
+    const scroller = document.querySelector('[data-workspace-scroll]')
+    const scrollerEl = scroller instanceof HTMLElement ? scroller : null
     const onScroll = () => {
-      setOffset(document.body.scrollTop || document.documentElement.scrollTop)
+      const top = scrollerEl
+        ? scrollerEl.scrollTop
+        : document.body.scrollTop || document.documentElement.scrollTop
+      setOffset(top)
     }
 
-    // Add scroll listener to the body
-    document.addEventListener('scroll', onScroll, { passive: true })
-
-    // Clean up the event listener on unmount
-    return () => document.removeEventListener('scroll', onScroll)
+    const target: HTMLElement | Document = scrollerEl ?? document
+    target.addEventListener('scroll', onScroll, { passive: true })
+    return () => target.removeEventListener('scroll', onScroll)
   }, [])
 
   return (

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +11,8 @@ import (
 	"github.com/stock/ashare/internal/backtest"
 	"github.com/stock/ashare/internal/config"
 	"github.com/stock/ashare/internal/dates"
+	"github.com/stock/ashare/internal/domain"
+	"github.com/stock/ashare/internal/indicator"
 	"github.com/stock/ashare/internal/ingest"
 	"github.com/stock/ashare/internal/repo"
 	"gorm.io/gorm"
@@ -21,6 +24,8 @@ type Handler struct {
 	market      *repo.MarketRepo
 	cb          *repo.CBRepo
 	runs        *repo.IngestRunRepo
+	users       *repo.UserRepo
+	notes       *repo.NoteRepo
 	runner      *ingest.Runner
 }
 
@@ -66,30 +71,105 @@ func (h *Handler) bars(c *gin.Context) {
 	if !ok {
 		return
 	}
-	start, end, err := parseRange(c)
-	if err != nil {
-		abortJSON(c, http.StatusBadRequest, err.Error())
-		return
-	}
 	qfq := c.Query("qfq") == "1" || c.Query("qfq") == "true"
-	limit := 0
-	if start.IsZero() && end.IsZero() {
-		limit = 250
+	period := repo.NormalizeBarPeriod(c.Query("period"))
+	limit := parseLimit(c.Query("limit"), 0)
+
+	var rows []domain.DailyBar
+	var err error
+
+	if beforeStr := strings.TrimSpace(c.Query("before")); beforeStr != "" {
+		before, perr := dates.Parse(beforeStr)
+		if perr != nil {
+			abortJSON(c, http.StatusBadRequest, perr.Error())
+			return
+		}
+		if limit <= 0 {
+			limit = 250
+		}
+		rows, err = h.market.ListDailyBarsBefore(c.Request.Context(), code, before, limit, qfq, period)
+	} else {
+		start, end, perr := parseRange(c)
+		if perr != nil {
+			abortJSON(c, http.StatusBadRequest, perr.Error())
+			return
+		}
+		if limit <= 0 && start.IsZero() && end.IsZero() {
+			limit = 250
+		}
+		rows, err = h.market.ListDailyBars(c.Request.Context(), code, start, end, limit, qfq, period)
 	}
-	rows, err := h.market.ListDailyBars(c.Request.Context(), code, start, end, limit, qfq)
 	if err != nil {
 		abortJSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	out := make([]barDTO, 0, len(rows))
-	for _, b := range rows {
+	closes := make([]float64, len(rows))
+	for i, b := range rows {
 		out = append(out, toBarDTO(b))
+		closes[i] = b.Close
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"instrument": inst,
 		"qfq":        qfq,
+		"period":     string(period),
 		"bars":       out,
+		"indicators": indicatorsJSON(closes),
+		"has_more":   limit > 0 && len(rows) >= limit,
 	})
+}
+
+func (h *Handler) indicators(c *gin.Context) {
+	var req struct {
+		Closes []float64 `json:"closes"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		abortJSON(c, http.StatusBadRequest, "需要 closes 数组")
+		return
+	}
+	if len(req.Closes) > 5000 {
+		abortJSON(c, http.StatusBadRequest, "closes 过长（最多 5000）")
+		return
+	}
+	c.JSON(http.StatusOK, indicatorsJSON(req.Closes))
+}
+
+func indicatorsJSON(closes []float64) gin.H {
+	macd := indicator.MACDDefault(closes)
+	return gin.H{
+		"rsi":       floatOrNullSlice(indicator.RSI14(closes)),
+		"macd_dif":  floatOrNullSlice(macd.DIF),
+		"macd_dea":  floatOrNullSlice(macd.DEA),
+		"macd_hist": floatOrNullSlice(macd.HIST),
+	}
+}
+
+// floatOrNullSlice 把 NaN/Inf 编成 JSON null，其余保留为 number。
+func floatOrNullSlice(xs []float64) []any {
+	out := make([]any, len(xs))
+	for i, v := range xs {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			out[i] = nil
+			continue
+		}
+		out[i] = v
+	}
+	return out
+}
+
+func parseLimit(s string, def int) int {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return def
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return def
+	}
+	if n > 1000 {
+		return 1000
+	}
+	return n
 }
 
 func (h *Handler) gaps(c *gin.Context) {
@@ -102,7 +182,7 @@ func (h *Handler) gaps(c *gin.Context) {
 		abortJSON(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	rows, err := h.market.ListDailyBars(c.Request.Context(), code, start, end, 0, false)
+	rows, err := h.market.ListDailyBars(c.Request.Context(), code, start, end, 0, false, repo.PeriodDay)
 	if err != nil {
 		abortJSON(c, http.StatusInternalServerError, err.Error())
 		return

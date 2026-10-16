@@ -137,17 +137,20 @@ func (r *CBRepo) UpsertDaily(ctx context.Context, items []domain.CBDaily) error 
 	})
 }
 
-// CBListRow 列表用：基础信息 + 最新（或指定日）行情。
+// CBListRow 列表用：基础信息 + 最新（或指定日）行情 + 流通规模。
 type CBListRow struct {
 	domain.CBBasic
-	QuoteDate  *time.Time `gorm:"column:quote_date"`
-	PreClose   *float64   `gorm:"column:pre_close"`
-	Close      *float64   `gorm:"column:close"`
-	Change     *float64   `gorm:"column:change"`
-	PctChg     *float64   `gorm:"column:pct_chg"`
-	Volume     *float64   `gorm:"column:volume"`
-	Amount     *float64   `gorm:"column:amount"`
-	CBOverRate *float64   `gorm:"column:cb_over_rate"` // 转股溢价率 %
+	QuoteDate   *time.Time `gorm:"column:quote_date"`
+	PreClose    *float64   `gorm:"column:pre_close"`
+	Close       *float64   `gorm:"column:close"`
+	Change      *float64   `gorm:"column:change"`
+	PctChg      *float64   `gorm:"column:pct_chg"`
+	Volume      *float64   `gorm:"column:volume"`
+	Amount      *float64   `gorm:"column:amount"`
+	CBOverRate  *float64   `gorm:"column:cb_over_rate"` // 转股溢价率 %
+	Top10Ratio  *float64   `gorm:"column:top10_ratio"`  // 最近一期十大合计持仓占比 %
+	HolderCount *int64     `gorm:"column:holder_count"`
+	FloatSize   *float64   `gorm:"column:float_size"` // 流通规模（元）= 余额 × (1 - 十大占比)
 }
 
 // CBListQuery 可转债列表检索。SortBy 见 cbSortColumns；SortDesc 为 true 时降序。
@@ -173,6 +176,9 @@ var cbSortColumns = map[string]string{
 	"maturity_call_price": "b.maturity_call_price",
 	"rating":              "COALESCE(NULLIF(b.newest_rating, ''), b.issue_rating)",
 	"quote_date":          "q.quote_date",
+	"issue_size":          "b.issue_size",
+	"remain_size":         "b.remain_size",
+	"float_size":          "(" + cbFloatSizeExpr + ")",
 }
 
 func cbOrderBy(sortBy string, sortDesc bool) string {
@@ -187,7 +193,10 @@ func cbOrderBy(sortBy string, sortDesc bool) string {
 	return col + " " + dir + " NULLS LAST, b.ts_code ASC"
 }
 
-// cbListJoinWhere 拼列表用的行情 lateral join 与筛选条件（不含 ORDER/LIMIT）。
+// cbFloatSizeExpr 流通规模：无十大持有人时等于余额，否则余额 × (1 - 十大占比)。
+const cbFloatSizeExpr = `CASE WHEN b.remain_size IS NULL THEN NULL WHEN th.holder_count IS NULL OR th.holder_count = 0 THEN b.remain_size ELSE b.remain_size * (100.0 - COALESCE(th.top10_ratio, 0)) / 100.0 END`
+
+// cbListJoinWhere 拼列表用的行情 / 十大持仓 lateral join 与筛选条件（不含 ORDER/LIMIT）。
 func cbListJoinWhere(query CBListQuery) (joinSQL, where string, args []any) {
 	q := strings.TrimSpace(query.Q)
 	joinSQL = `
@@ -203,7 +212,16 @@ LEFT JOIN LATERAL (
 	joinSQL += `
   ORDER BY d.trade_date DESC
   LIMIT 1
-) q ON true`
+) q ON true
+LEFT JOIN LATERAL (
+  SELECT COALESCE(SUM(h.hold_ratio), 0) AS top10_ratio,
+         COUNT(*)::bigint AS holder_count
+  FROM cb_top_holder h
+  WHERE h.ts_code = b.ts_code
+    AND h.end_date = (
+      SELECT MAX(x.end_date) FROM cb_top_holder x WHERE x.ts_code = b.ts_code
+    )
+) th ON true`
 
 	where = "1=1"
 	if q != "" {
@@ -245,7 +263,9 @@ func (r *CBRepo) SearchWithQuote(ctx context.Context, query CBListQuery) ([]CBLi
 	joinSQL, where, args := cbListJoinWhere(query)
 	sql := `
 SELECT b.*, q.quote_date, q.pre_close, q.close, q.change, q.pct_chg,
-       q.volume, q.amount, q.cb_over_rate
+       q.volume, q.amount, q.cb_over_rate,
+       th.top10_ratio, th.holder_count,
+       ` + cbFloatSizeExpr + ` AS float_size
 FROM cb_basic b
 ` + joinSQL + `
 WHERE ` + where + `

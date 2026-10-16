@@ -3,6 +3,8 @@ import {
   Database,
   Landmark,
   LineChart,
+  List,
+  NotebookPen,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -29,6 +31,11 @@ export const sidebarData: SidebarData = {
           icon: CandlestickChart,
         },
         {
+          title: '股票',
+          url: '/stocks',
+          icon: List,
+        },
+        {
           title: '可转债',
           url: '/cb',
           icon: Landmark,
@@ -42,6 +49,11 @@ export const sidebarData: SidebarData = {
           title: '最小回测',
           url: '/backtest',
           icon: LineChart,
+        },
+        {
+          title: '笔记',
+          url: '/notes',
+          icon: NotebookPen,
         },
       ],
     },

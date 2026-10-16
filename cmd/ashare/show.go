@@ -36,7 +36,7 @@ func cmdShow(ctx context.Context, cfg config.Config, args []string) error {
 	}
 	inst, _ := instruments.GetByTSCode(ctx, tsCode)
 
-	bars, err := market.ListDailyBars(ctx, tsCode, start, end, 60, qfq)
+	bars, err := market.ListDailyBars(ctx, tsCode, start, end, 60, qfq, repo.PeriodDay)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func cmdStats(ctx context.Context, cfg config.Config, args []string) error {
 	}
 	inst, _ := instruments.GetByTSCode(ctx, tsCode)
 
-	bars, err := market.ListDailyBars(ctx, tsCode, start, end, 0, true)
+	bars, err := market.ListDailyBars(ctx, tsCode, start, end, 0, true, repo.PeriodDay)
 	if err != nil {
 		return err
 	}

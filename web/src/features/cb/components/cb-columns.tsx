@@ -31,6 +31,13 @@ function fmtPct(n: number | null | undefined) {
   return `${sign}${n.toFixed(2)}%`
 }
 
+/** 规模（元）：≥1 亿显示 xx亿，否则 xx万。 */
+function fmtSizeYuan(n: number | null | undefined) {
+  if (n == null || Number.isNaN(n)) return '—'
+  if (Math.abs(n) >= 1e8) return `${(n / 1e8).toFixed(2)}亿`
+  return `${(n / 1e4).toFixed(2)}万`
+}
+
 export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   return [
   {
@@ -92,6 +99,33 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
     ),
     cell: ({ row }) => (
       <div className='text-right tabular-nums'>{fmtPct(row.original.cb_over_rate)}</div>
+    ),
+  },
+  {
+    accessorKey: 'issue_size',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='初始规模' className='justify-end' />
+    ),
+    cell: ({ row }) => (
+      <div className='text-right tabular-nums'>{fmtSizeYuan(row.original.issue_size)}</div>
+    ),
+  },
+  {
+    accessorKey: 'remain_size',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='剩余规模' className='justify-end' />
+    ),
+    cell: ({ row }) => (
+      <div className='text-right tabular-nums'>{fmtSizeYuan(row.original.remain_size)}</div>
+    ),
+  },
+  {
+    accessorKey: 'float_size',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='流通规模' className='justify-end' />
+    ),
+    cell: ({ row }) => (
+      <div className='text-right tabular-nums'>{fmtSizeYuan(row.original.float_size)}</div>
     ),
   },
   {

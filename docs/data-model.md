@@ -75,6 +75,17 @@ hfq_price = raw_price * adj_factor / first_adj_factor
 
 分红送股后未复权价格会跳变，策略里的均线、动量应使用复权价；涨跌停判断必须用未复权价和停牌标记。
 
+## 周线 / 月线视图
+
+不单独落库，由日线聚合（migration `005_bar_week_month.sql`）：
+
+| 视图 | 来源 |
+|---|---|
+| `daily_bar_week` / `daily_bar_month` | `daily_bar` |
+| `daily_bar_week_qfq` / `daily_bar_month_qfq` | `daily_bar_qfq` |
+
+规则：自然周（周一起点）/ 自然月；`trade_date` 为周期内最后交易日；open/close 取首末日；high/low 取极值；volume/amount 求和。涨跌停标记在周月线上为空；`is_paused` 为周期内是否曾停牌。
+
 ## suspension
 
 按交易日记录停牌。自然键：`(ts_code, trade_date)`。回测撮合时：当日停牌则买卖都不成交。
