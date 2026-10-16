@@ -49,8 +49,8 @@ func TestDailyFromRow(t *testing.T) {
 		"pre_close":  "10.2",
 		"vol":        "1000",
 		"amount":     "200",
-		"up_limit":   "11.22",
-		"down_limit": "9.18",
+		"change":     "0.2",
+		"pct_chg":    "1.96",
 	})
 	if !ok {
 		t.Fatal("parse")
@@ -67,8 +67,8 @@ func TestDailyFromRow(t *testing.T) {
 	if bar.IsPaused {
 		t.Fatal("paused")
 	}
-	if bar.HighLimit == nil || *bar.HighLimit != 11.22 {
-		t.Fatal("high limit")
+	if bar.Change == nil || *bar.Change != 0.2 {
+		t.Fatal("change")
 	}
 }
 
@@ -93,5 +93,87 @@ func TestCalendarFromRow(t *testing.T) {
 	}
 	if row.PretradeDate == nil || row.PretradeDate.Format(time.DateOnly) != "2025-12-31" {
 		t.Fatalf("pre=%v", row.PretradeDate)
+	}
+}
+
+func TestInstrumentFromRowAllFields(t *testing.T) {
+	it, err := instrumentFromRow(Row{
+		"ts_code":      "000001.SZ",
+		"symbol":       "000001",
+		"name":         "平安银行",
+		"area":         "深圳",
+		"industry":     "银行",
+		"fullname":     "平安银行股份有限公司",
+		"enname":       "Ping An Bank",
+		"cnspell":      "PAYH",
+		"market":       "主板",
+		"exchange":     "SZSE",
+		"curr_type":    "CNY",
+		"list_status":  "L",
+		"list_date":    "19910403",
+		"is_hs":        "S",
+		"act_name":     "深圳市投资控股",
+		"act_ent_type": "地方国有",
+	})
+	if err != nil || it.TSCode != "000001.SZ" || it.Area != "深圳" || it.ListStatus != "L" || it.IsHS != "S" {
+		t.Fatalf("%+v err=%v", it, err)
+	}
+}
+
+func TestStkLimitAndDailyBasicFromRow(t *testing.T) {
+	lim, ok := stkLimitFromRow(Row{
+		"ts_code":    "000001.SZ",
+		"trade_date": "20260105",
+		"up_limit":   "11.22",
+		"down_limit": "9.18",
+		"asset_type": "STK",
+		"exchange":   "SZSE",
+	})
+	if !ok || lim.UpLimit == nil || *lim.UpLimit != 11.22 || lim.AssetType != "STK" {
+		t.Fatalf("%+v", lim)
+	}
+	b, ok := dailyBasicFromRow(Row{
+		"ts_code":       "000001.SZ",
+		"trade_date":    "20260105",
+		"turnover_rate": "1.2",
+		"pe":            "8.5",
+		"total_share":   "1000",
+		"limit_status":  "1",
+	})
+	if !ok || b.PE == nil || *b.PE != 8.5 || b.LimitStatus == nil || *b.LimitStatus != 1 {
+		t.Fatalf("%+v", b)
+	}
+}
+
+func TestIndexAndETFFromRow(t *testing.T) {
+	ib, ok := indexBasicFromRow(Row{
+		"ts_code":    "000300.SH",
+		"name":       "沪深300",
+		"market":     "SSE",
+		"desc":       "规模指数",
+		"base_point": "1000",
+	})
+	if !ok || ib.Description != "规模指数" || ib.BasePoint == nil {
+		t.Fatalf("%+v", ib)
+	}
+	etf, ok := etfBasicFromRow(Row{
+		"ts_code":     "510330.SH",
+		"extname":     "沪深300ETF华夏",
+		"list_status": "L",
+		"exchange":    "SH",
+		"etf_type":    "境内",
+	})
+	if !ok || etf.Extname == "" || etf.ETFType != "境内" {
+		t.Fatalf("%+v", etf)
+	}
+	sh, ok := etfSHConsFromRow(Row{
+		"trade_date": "20260615",
+		"ts_code":    "517030.SH",
+		"con_code":   "000001.SZ",
+		"qty":        "1100",
+		"cpr":        "-",
+	})
+	if !ok || sh.Qty == nil || *sh.Qty != 1100 || sh.CPR != nil {
+		t.Fatalf("%+v", sh)
 	}
 }

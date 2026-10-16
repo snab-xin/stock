@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/stock/ashare/internal/dates"
@@ -32,13 +33,14 @@ type barDTO struct {
 }
 
 type runDTO struct {
-	ID           int64  `json:"id"`
-	JobName      string `json:"job_name"`
-	Status       string `json:"status"`
-	Message      string `json:"message"`
-	RowsAffected int64  `json:"rows_affected"`
-	StartedAt    string `json:"started_at"`
-	FinishedAt   string `json:"finished_at,omitempty"`
+	ID           int64           `json:"id"`
+	JobName      string          `json:"job_name"`
+	Status       string          `json:"status"`
+	Message      string          `json:"message"`
+	RowsAffected int64           `json:"rows_affected"`
+	StartedAt    string          `json:"started_at"`
+	FinishedAt   string          `json:"finished_at,omitempty"`
+	Params       json.RawMessage `json:"params"`
 }
 
 type backtestRequest struct {
@@ -57,7 +59,7 @@ func toInstrumentDTO(it domain.Instrument) instrumentDTO {
 		Name:     it.Name,
 		Exchange: it.Exchange,
 		IsST:     it.IsST,
-		Status:   it.Status,
+		Status:   it.ListStatus,
 	}
 }
 
@@ -79,6 +81,10 @@ func toBarDTO(b domain.DailyBar) barDTO {
 }
 
 func toRunDTO(row domain.IngestRun) runDTO {
+	params := json.RawMessage(row.Params)
+	if len(params) == 0 {
+		params = json.RawMessage("{}")
+	}
 	dto := runDTO{
 		ID:           row.ID,
 		JobName:      row.JobName,
@@ -86,6 +92,7 @@ func toRunDTO(row domain.IngestRun) runDTO {
 		Message:      row.Message,
 		RowsAffected: row.RowsAffected,
 		StartedAt:    row.StartedAt.Format(time.RFC3339),
+		Params:       params,
 	}
 	if row.FinishedAt != nil {
 		dto.FinishedAt = row.FinishedAt.Format(time.RFC3339)

@@ -2,8 +2,10 @@ package ingest
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/stock/ashare/internal/applog"
@@ -12,11 +14,47 @@ import (
 	"github.com/stock/ashare/internal/repo"
 )
 
+type runArgs struct {
+	Start  time.Time
+	End    time.Time
+	Period time.Time
+	Date   time.Time
+	Codes  []string
+}
+
+func encodeRunParams(job string, a runArgs) domain.JSONObject {
+	m := map[string]any{"job": job}
+	if !a.Start.IsZero() {
+		m["start"] = dates.YYYYMMDD(a.Start)
+	}
+	if !a.End.IsZero() {
+		m["end"] = dates.YYYYMMDD(a.End)
+	}
+	if !a.Period.IsZero() {
+		m["period"] = dates.YYYYMMDD(a.Period)
+	}
+	if !a.Date.IsZero() {
+		m["date"] = dates.YYYYMMDD(a.Date)
+	}
+	if len(a.Codes) == 1 {
+		m["code"] = a.Codes[0]
+	} else if len(a.Codes) > 1 {
+		m["code"] = strings.Join(a.Codes, ",")
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return domain.JSONObject("{}")
+	}
+	return b
+}
+
 type Service struct {
 	Source      MarketSource
 	Instruments *repo.InstrumentRepo
 	Market      *repo.MarketRepo
 	CB          *repo.CBRepo
+	Index       *repo.IndexRepo
+	ETF         *repo.ETFRepo
 	Runs        *repo.IngestRunRepo
 	log         *slog.Logger
 }
@@ -29,8 +67,8 @@ func (s *Service) logger() *slog.Logger {
 	return s.log
 }
 
-func (s *Service) withRun(ctx context.Context, job string, fn func() (int64, error)) error {
-	run, err := s.Runs.Start(ctx, job)
+func (s *Service) withRun(ctx context.Context, job string, args runArgs, fn func() (int64, error)) error {
+	run, err := s.Runs.Start(ctx, job, encodeRunParams(job, args))
 	if err != nil {
 		return err
 	}
@@ -46,7 +84,7 @@ func (s *Service) withRun(ctx context.Context, job string, fn func() (int64, err
 }
 
 func (s *Service) SyncInstruments(ctx context.Context) error {
-	return s.withRun(ctx, "instruments", func() (int64, error) {
+	return s.withRun(ctx, "instruments", runArgs{}, func() (int64, error) {
 		items, err := s.Source.ListInstruments(ctx)
 		if err != nil {
 			return 0, err
@@ -60,7 +98,7 @@ func (s *Service) SyncInstruments(ctx context.Context) error {
 }
 
 func (s *Service) SyncCalendar(ctx context.Context, start, end time.Time) error {
-	return s.withRun(ctx, "calendar", func() (int64, error) {
+	return s.withRun(ctx, "calendar", runArgs{Start: start, End: end}, func() (int64, error) {
 		var total int64
 		var sse []domain.TradeCalendar
 		for _, ex := range []string{"SSE", "SZSE"} {
@@ -90,7 +128,7 @@ func (s *Service) SyncCalendar(ctx context.Context, start, end time.Time) error 
 }
 
 func (s *Service) SyncDaily(ctx context.Context, start, end time.Time, codes []string) error {
-	return s.withRun(ctx, "daily", func() (int64, error) {
+	return s.withRun(ctx, "daily", runArgs{Start: start, End: end, Codes: codes}, func() (int64, error) {
 		if start.IsZero() || end.IsZero() {
 			return 0, fmt.Errorf("ingest daily 需要 -start 和 -end")
 		}
@@ -127,28 +165,11 @@ func (s *Service) SyncDaily(ctx context.Context, start, end time.Time, codes []s
 		}
 
 		for _, d := range days {
-			q := BarQuery{TradeDate: d}
-			bars, err := s.Source.ListDailyBars(ctx, q)
+			n, err := s.syncDailySlice(ctx, BarQuery{TradeDate: d}, susp)
 			if err != nil {
 				return total, fmt.Errorf("%s 日线: %w", dates.ISO(d), err)
 			}
-			MarkPaused(bars, susp)
-			if err := s.Market.UpsertDailyBars(ctx, bars); err != nil {
-				return total, err
-			}
-			adjs, err := s.Source.ListAdjFactors(ctx, q)
-			if err != nil {
-				return total, fmt.Errorf("%s 复权因子: %w", dates.ISO(d), err)
-			}
-			if err := s.Market.UpsertAdjFactors(ctx, adjs); err != nil {
-				return total, err
-			}
-			s.logger().Info("daily upserted",
-				"trade_date", dates.ISO(d),
-				"bars", len(bars),
-				"adj", len(adjs),
-			)
-			total += int64(len(bars) + len(adjs))
+			total += n
 		}
 		return total, nil
 	})
@@ -166,16 +187,37 @@ func (s *Service) SyncAll(ctx context.Context, start, end time.Time, codes []str
 
 func (s *Service) syncCodeRange(ctx context.Context, code string, start, end time.Time) (int64, error) {
 	q := BarQuery{TSCode: code, Start: start, End: end}
-	bars, err := s.Source.ListDailyBars(ctx, q)
-	if err != nil {
-		return 0, err
-	}
 	susp, err := s.Source.ListSuspensions(ctx, q)
 	if err != nil {
+		s.logger().Warn("suspension skipped", "err", err)
 		susp = nil
 	} else if err := s.Market.UpsertSuspensions(ctx, susp); err != nil {
 		return 0, err
 	}
+	return s.syncDailySlice(ctx, q, susp)
+}
+
+func (s *Service) syncDailySlice(ctx context.Context, q BarQuery, susp []domain.Suspension) (int64, error) {
+	bars, err := s.Source.ListDailyBars(ctx, q)
+	if err != nil {
+		return 0, err
+	}
+	limits, err := s.Source.ListStkLimits(ctx, q)
+	if err != nil {
+		s.logger().Warn("stk_limit skipped", "err", err)
+		limits = nil
+	} else if err := s.Market.UpsertStkLimits(ctx, limits); err != nil {
+		return 0, err
+	}
+	basics, err := s.Source.ListDailyBasics(ctx, q)
+	if err != nil {
+		s.logger().Warn("daily_basic skipped", "err", err)
+		basics = nil
+	} else if err := s.Market.UpsertDailyBasics(ctx, basics); err != nil {
+		return 0, err
+	}
+	ApplyLimits(bars, limits)
+	ApplyTurnover(bars, basics)
 	MarkPaused(bars, susp)
 	if err := s.Market.UpsertDailyBars(ctx, bars); err != nil {
 		return 0, err
@@ -187,19 +229,25 @@ func (s *Service) syncCodeRange(ctx context.Context, code string, start, end tim
 	if err := s.Market.UpsertAdjFactors(ctx, adjs); err != nil {
 		return 0, err
 	}
+	label := q.TSCode
+	if label == "" && !q.TradeDate.IsZero() {
+		label = dates.ISO(q.TradeDate)
+	}
 	s.logger().Info("daily upserted",
-		"ts_code", code,
+		"key", label,
 		"bars", len(bars),
+		"stk_limit", len(limits),
+		"daily_basic", len(basics),
 		"adj", len(adjs),
 	)
-	return int64(len(bars) + len(adjs)), nil
+	return int64(len(bars) + len(limits) + len(basics) + len(adjs)), nil
 }
 
 func (s *Service) SyncCBBasic(ctx context.Context) error {
 	if s.CB == nil {
 		return fmt.Errorf("未配置可转债仓储")
 	}
-	return s.withRun(ctx, "cb_basic", func() (int64, error) {
+	return s.withRun(ctx, "cb_basic", runArgs{}, func() (int64, error) {
 		items, err := s.Source.ListCBBasic(ctx)
 		if err != nil {
 			return 0, err
@@ -216,7 +264,7 @@ func (s *Service) SyncCBDaily(ctx context.Context, start, end, tradeDate time.Ti
 	if s.CB == nil {
 		return fmt.Errorf("未配置可转债仓储")
 	}
-	return s.withRun(ctx, "cb_daily", func() (int64, error) {
+	return s.withRun(ctx, "cb_daily", runArgs{Start: start, End: end, Date: tradeDate, Codes: codes}, func() (int64, error) {
 		var total int64
 		if !tradeDate.IsZero() {
 			rows, err := s.Source.ListCBDaily(ctx, CBDailyQuery{TradeDate: tradeDate})
@@ -269,7 +317,7 @@ func (s *Service) SyncCBTopHolders(ctx context.Context, period, start, end time.
 	if s.CB == nil {
 		return fmt.Errorf("未配置可转债仓储")
 	}
-	return s.withRun(ctx, "cb_holders", func() (int64, error) {
+	return s.withRun(ctx, "cb_holders", runArgs{Period: period, Start: start, End: end, Codes: codes}, func() (int64, error) {
 		if len(codes) == 0 {
 			var err error
 			codes, err = s.CB.ListTSCodes(ctx)

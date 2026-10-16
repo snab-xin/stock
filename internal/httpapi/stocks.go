@@ -115,7 +115,7 @@ func toStockListRowDTO(it repo.StockListRow) stockListItemDTO {
 		Name:        it.Name,
 		Exchange:    it.Exchange,
 		IsST:        it.IsST,
-		Status:      it.Status,
+		Status:      it.ListStatus,
 		ListDate:    dateISO(it.ListDate),
 		DelistDate:  dateISO(it.DelistDate),
 		PreClose:    it.PreClose,

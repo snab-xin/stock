@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS cb_top_holder (
     holder_name  TEXT         NOT NULL DEFAULT '',
     hold_amount  NUMERIC(24, 6),
     hold_ratio   NUMERIC(12, 6),
+    type         smallint     NOT NULL DEFAULT 0,
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT uk_cb_top_holder UNIQUE (ts_code, end_date, holder_rank)
@@ -124,6 +125,7 @@ COMMENT ON COLUMN cb_top_holder.hold_amount IS '持有数量，单位：万张�
 COMMENT ON COLUMN cb_top_holder.hold_ratio IS '持有比例（%）';
 COMMENT ON COLUMN cb_top_holder.created_at IS '首次写入时间';
 COMMENT ON COLUMN cb_top_holder.updated_at IS '最后更新时间';
+COMMENT ON COLUMN cb_top_holder.type IS '0:自动抓取，1:手动更新';
 
 DROP TRIGGER IF EXISTS trg_cb_top_holder_updated_at ON cb_top_holder;
 CREATE TRIGGER trg_cb_top_holder_updated_at

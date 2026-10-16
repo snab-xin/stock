@@ -2,7 +2,6 @@ package tushare
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/stock/ashare/internal/dates"
@@ -20,10 +19,11 @@ func NewSource(client *Client) *Source {
 
 func (s *Source) ListInstruments(ctx context.Context) ([]domain.Instrument, error) {
 	var all []domain.Instrument
-	for _, status := range []string{"L", "D", "P"} {
+	// 股票基本信息 https://tushare.pro/document/2?doc_id=25
+	for _, status := range []string{"L", "D", "P", "G", "UN"} {
 		rows, err := s.client.Query(ctx, "stock_basic", map[string]string{
 			"list_status": status,
-		}, "ts_code,symbol,name,exchange,list_status,list_date,delist_date")
+		}, stockBasicFields)
 		if err != nil {
 			return nil, err
 		}
@@ -39,11 +39,12 @@ func (s *Source) ListInstruments(ctx context.Context) ([]domain.Instrument, erro
 }
 
 func (s *Source) ListCalendar(ctx context.Context, exchange string, start, end time.Time) ([]domain.TradeCalendar, error) {
+	// 交易日历 https://tushare.pro/document/2?doc_id=26
 	rows, err := s.client.Query(ctx, "trade_cal", map[string]string{
 		"exchange":   exchange,
 		"start_date": dates.YYYYMMDD(start),
 		"end_date":   dates.YYYYMMDD(end),
-	}, "exchange,cal_date,is_open,pretrade_date")
+	}, tradeCalFields)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,8 @@ func (s *Source) ListCalendar(ctx context.Context, exchange string, start, end t
 }
 
 func (s *Source) ListDailyBars(ctx context.Context, q ingest.BarQuery) ([]domain.DailyBar, error) {
-	dailyRows, err := s.client.Query(ctx, "daily", barParams(q), "ts_code,trade_date,open,high,low,close,pre_close,vol,amount")
+	// 日线行情 https://tushare.pro/document/2?doc_id=27
+	dailyRows, err := s.client.Query(ctx, "daily", barParams(q), dailyFields)
 	if err != nil {
 		return nil, err
 	}
@@ -73,23 +75,42 @@ func (s *Source) ListDailyBars(ctx context.Context, q ingest.BarQuery) ([]domain
 			bars = append(bars, bar)
 		}
 	}
-
-	if limitRows, err := s.client.Query(ctx, "stk_limit", barParams(q), "ts_code,trade_date,up_limit,down_limit"); err != nil {
-		slog.Warn("stk_limit skipped", "component", "tushare", "err", err)
-	} else {
-		applyLimits(bars, limitRows)
-	}
-
-	if basicRows, err := s.client.Query(ctx, "daily_basic", barParams(q), "ts_code,trade_date,turnover_rate"); err != nil {
-		slog.Warn("daily_basic skipped", "component", "tushare", "err", err)
-	} else {
-		applyTurnover(bars, basicRows)
-	}
 	return bars, nil
 }
 
+func (s *Source) ListStkLimits(ctx context.Context, q ingest.BarQuery) ([]domain.StkLimit, error) {
+	// 涨跌停价格 https://tushare.pro/document/2?doc_id=183
+	rows, err := s.client.Query(ctx, "stk_limit", barParams(q), stkLimitFields)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.StkLimit, 0, len(rows))
+	for _, row := range rows {
+		if it, ok := stkLimitFromRow(row); ok {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+func (s *Source) ListDailyBasics(ctx context.Context, q ingest.BarQuery) ([]domain.DailyBasic, error) {
+	// 每日指标 https://tushare.pro/document/2?doc_id=32
+	rows, err := s.client.Query(ctx, "daily_basic", barParams(q), dailyBasicFields)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.DailyBasic, 0, len(rows))
+	for _, row := range rows {
+		if it, ok := dailyBasicFromRow(row); ok {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
 func (s *Source) ListAdjFactors(ctx context.Context, q ingest.BarQuery) ([]domain.AdjFactor, error) {
-	rows, err := s.client.Query(ctx, "adj_factor", barParams(q), "ts_code,trade_date,adj_factor")
+	// 复权因子 https://tushare.pro/document/2?doc_id=28
+	rows, err := s.client.Query(ctx, "adj_factor", barParams(q), adjFactorFields)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +124,7 @@ func (s *Source) ListAdjFactors(ctx context.Context, q ingest.BarQuery) ([]domai
 }
 
 func (s *Source) ListSuspensions(ctx context.Context, q ingest.BarQuery) ([]domain.Suspension, error) {
+	// 停牌复牌信息 https://tushare.pro/document/2?doc_id=214
 	params := map[string]string{}
 	if q.TSCode != "" {
 		params["ts_code"] = q.TSCode
@@ -117,7 +139,7 @@ func (s *Source) ListSuspensions(ctx context.Context, q ingest.BarQuery) ([]doma
 			params["end_date"] = dates.YYYYMMDD(q.End)
 		}
 	}
-	rows, err := s.client.Query(ctx, "suspend_d", params, "ts_code,trade_date,suspend_timing,suspend_type")
+	rows, err := s.client.QueryPages(ctx, "suspend_d", params, suspendFields, 5000)
 	if err != nil {
 		return nil, err
 	}
@@ -146,24 +168,4 @@ func barParams(q ingest.BarQuery) map[string]string {
 		params["end_date"] = dates.YYYYMMDD(q.End)
 	}
 	return params
-}
-
-func applyTurnover(bars []domain.DailyBar, rows []Row) {
-	type key struct {
-		code string
-		day  string
-	}
-	idx := make(map[key]*float64, len(rows))
-	for _, row := range rows {
-		d, err := row.Date("trade_date")
-		if err != nil {
-			continue
-		}
-		idx[key{row.Str("ts_code"), d.Format("20060102")}] = row.FloatPtr("turnover_rate")
-	}
-	for i := range bars {
-		if t, ok := idx[key{bars[i].TSCode, bars[i].TradeDate.Format("20060102")}]; ok {
-			bars[i].Turnover = t
-		}
-	}
 }

@@ -56,6 +56,7 @@ export function stockColumns(listSearch: StockListSearch): ColumnDef<StockListIt
   return [
     {
       accessorKey: 'ts_code',
+      enableSorting: true,
       header: ({ column }) => <DataTableColumnHeader column={column} title='代码' />,
       cell: ({ row }) => (
         <Link
@@ -69,6 +70,7 @@ export function stockColumns(listSearch: StockListSearch): ColumnDef<StockListIt
     },
     {
       accessorKey: 'name',
+      enableSorting: true,
       header: ({ column }) => <DataTableColumnHeader column={column} title='名称' />,
       cell: ({ row }) => (
         <div className='flex items-center gap-1.5'>
@@ -83,6 +85,7 @@ export function stockColumns(listSearch: StockListSearch): ColumnDef<StockListIt
     },
     {
       accessorKey: 'close',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title='现价' className='justify-end' />
       ),
@@ -94,6 +97,7 @@ export function stockColumns(listSearch: StockListSearch): ColumnDef<StockListIt
     },
     {
       accessorKey: 'change',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title='涨跌' className='justify-end' />
       ),
@@ -105,6 +109,7 @@ export function stockColumns(listSearch: StockListSearch): ColumnDef<StockListIt
     },
     {
       accessorKey: 'pct_chg',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title='涨跌幅' className='justify-end' />
       ),
@@ -116,6 +121,7 @@ export function stockColumns(listSearch: StockListSearch): ColumnDef<StockListIt
     },
     {
       accessorKey: 'volume',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title='成交量' className='justify-end' />
       ),
@@ -125,6 +131,7 @@ export function stockColumns(listSearch: StockListSearch): ColumnDef<StockListIt
     },
     {
       accessorKey: 'amount',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title='成交额' className='justify-end' />
       ),
@@ -168,6 +175,7 @@ export function stockColumns(listSearch: StockListSearch): ColumnDef<StockListIt
     },
     {
       accessorKey: 'quote_date',
+      enableSorting: true,
       header: ({ column }) => <DataTableColumnHeader column={column} title='行情日' />,
       cell: ({ row }) => {
         const it = row.original

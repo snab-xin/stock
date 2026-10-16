@@ -20,6 +20,8 @@ func NewIngestService(cfg config.Config, gdb *gorm.DB) (*ingest.Service, error) 
 		Instruments: repo.NewInstrumentRepo(gdb),
 		Market:      repo.NewMarketRepo(gdb),
 		CB:          repo.NewCBRepo(gdb),
+		Index:       repo.NewIndexRepo(gdb),
+		ETF:         repo.NewETFRepo(gdb),
 		Runs:        repo.NewIngestRunRepo(gdb),
 	}, nil
 }

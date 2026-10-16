@@ -68,12 +68,22 @@ func instrumentFromRow(row Row) (domain.Instrument, error) {
 		TSCode:     tsCode,
 		Symbol:     row.Str("symbol"),
 		Name:       name,
+		Area:       row.Str("area"),
+		Industry:   row.Str("industry"),
+		Fullname:   row.Str("fullname"),
+		Enname:     row.Str("enname"),
+		Cnspell:    row.Str("cnspell"),
+		Market:     row.Str("market"),
 		Exchange:   ex,
-		AssetType:  "stock",
+		CurrType:   row.Str("curr_type"),
+		ListStatus: status,
 		ListDate:   row.DatePtr("list_date"),
 		DelistDate: row.DatePtr("delist_date"),
+		IsHS:       row.Str("is_hs"),
+		ActName:    row.Str("act_name"),
+		ActEntType: row.Str("act_ent_type"),
+		AssetType:  "stock",
 		IsST:       isSTName(name),
-		Status:     status,
 	}, nil
 }
 
@@ -102,6 +112,8 @@ func dailyFromRow(row Row) (domain.DailyBar, bool) {
 	closePx, _ := row.Float("close")
 	vol, _ := row.Float("vol")
 	amount, _ := row.Float("amount")
+	ahVol, _ := row.Float("ah_vol")
+	ahAmount, _ := row.Float("ah_amount")
 	bar := domain.DailyBar{
 		TSCode:    tsCode,
 		TradeDate: d,
@@ -110,22 +122,61 @@ func dailyFromRow(row Row) (domain.DailyBar, bool) {
 		Low:       low,
 		Close:     closePx,
 		PreClose:  row.FloatPtr("pre_close"),
+		Change:    row.FloatPtr("change"),
+		PctChg:    row.FloatPtr("pct_chg"),
 		Volume:    tushareVolToShares(vol),
 		Amount:    tushareAmountToYuan(amount),
-		Turnover:  row.FloatPtr("turnover_rate"),
-	}
-	if up, ok := row.Float("up_limit"); ok {
-		bar.HighLimit = &up
-		v := limitHit(closePx, up, true)
-		bar.IsLimitUp = &v
-	}
-	if down, ok := row.Float("down_limit"); ok {
-		bar.LowLimit = &down
-		v := limitHit(closePx, down, false)
-		bar.IsLimitDown = &v
+		AHVolume:  tushareVolToShares(ahVol),
+		AHAmount:  tushareAmountToYuan(ahAmount),
 	}
 	bar.IsPaused = bar.Volume == 0
 	return bar, true
+}
+
+func stkLimitFromRow(row Row) (domain.StkLimit, bool) {
+	tsCode := row.Str("ts_code")
+	d, err := row.Date("trade_date")
+	if err != nil || tsCode == "" {
+		return domain.StkLimit{}, false
+	}
+	return domain.StkLimit{
+		TradeDate: d,
+		TSCode:    tsCode,
+		PreClose:  row.FloatPtr("pre_close"),
+		UpLimit:   row.FloatPtr("up_limit"),
+		DownLimit: row.FloatPtr("down_limit"),
+		AssetType: row.Str("asset_type"),
+		Exchange:  row.Str("exchange"),
+	}, true
+}
+
+func dailyBasicFromRow(row Row) (domain.DailyBasic, bool) {
+	tsCode := row.Str("ts_code")
+	d, err := row.Date("trade_date")
+	if err != nil || tsCode == "" {
+		return domain.DailyBasic{}, false
+	}
+	return domain.DailyBasic{
+		TSCode:        tsCode,
+		TradeDate:     d,
+		Close:         row.FloatPtr("close"),
+		TurnoverRate:  row.FloatPtr("turnover_rate"),
+		TurnoverRateF: row.FloatPtr("turnover_rate_f"),
+		VolumeRatio:   row.FloatPtr("volume_ratio"),
+		PE:            row.FloatPtr("pe"),
+		PETTM:         row.FloatPtr("pe_ttm"),
+		PB:            row.FloatPtr("pb"),
+		PS:            row.FloatPtr("ps"),
+		PSTTM:         row.FloatPtr("ps_ttm"),
+		DVRatio:       row.FloatPtr("dv_ratio"),
+		DVTTM:         row.FloatPtr("dv_ttm"),
+		TotalShare:    row.FloatPtr("total_share"),
+		FloatShare:    row.FloatPtr("float_share"),
+		FreeShare:     row.FloatPtr("free_share"),
+		TotalMV:       row.FloatPtr("total_mv"),
+		CircMV:        row.FloatPtr("circ_mv"),
+		LimitStatus:   row.IntPtr("limit_status"),
+	}, true
 }
 
 func adjFromRow(row Row) (domain.AdjFactor, bool) {
@@ -145,49 +196,9 @@ func suspendFromRow(row Row) (domain.Suspension, bool) {
 		return domain.Suspension{}, false
 	}
 	return domain.Suspension{
-		TSCode:      tsCode,
-		TradeDate:   d,
-		SuspendType: row.Str("suspend_type"),
-		Reason:      firstNonEmpty(row.Str("suspend_timing"), row.Str("reason")),
+		TSCode:        tsCode,
+		TradeDate:     d,
+		SuspendTiming: row.Str("suspend_timing"),
+		SuspendType:   row.Str("suspend_type"),
 	}, true
-}
-
-func firstNonEmpty(vs ...string) string {
-	for _, v := range vs {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
-func applyLimits(bars []domain.DailyBar, limits []Row) {
-	type key struct {
-		code string
-		day  string
-	}
-	idx := make(map[key]Row, len(limits))
-	for _, row := range limits {
-		d, err := row.Date("trade_date")
-		if err != nil {
-			continue
-		}
-		idx[key{row.Str("ts_code"), d.Format("20060102")}] = row
-	}
-	for i := range bars {
-		row, ok := idx[key{bars[i].TSCode, bars[i].TradeDate.Format("20060102")}]
-		if !ok {
-			continue
-		}
-		if up, ok := row.Float("up_limit"); ok {
-			bars[i].HighLimit = &up
-			v := limitHit(bars[i].Close, up, true)
-			bars[i].IsLimitUp = &v
-		}
-		if down, ok := row.Float("down_limit"); ok {
-			bars[i].LowLimit = &down
-			v := limitHit(bars[i].Close, down, false)
-			bars[i].IsLimitDown = &v
-		}
-	}
 }

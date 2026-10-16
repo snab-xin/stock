@@ -56,9 +56,25 @@ func (r *CBRepo) ReplaceTopHolders(ctx context.Context, tsCode string, endDate t
 		if len(items) == 0 {
 			return nil
 		}
-		return upsert(ctx, tx, &items, []string{"ts_code", "end_date", "holder_rank"}, []string{
+
+		err := upsert(ctx, tx, &items, []string{"ts_code", "end_date", "holder_rank"}, []string{
 			"holder_name", "hold_amount", "hold_ratio",
 		})
+		if err != nil {
+			return err
+		}
+		// 获取最新的十大股东合并占比
+		var totalHold float64
+		err = tx.Model(&domain.CBTopHolder{}).Where("ts_code = ? AND end_date >= ?", tsCode, endDate).Group("end_date").
+			Order("end_date DESC").
+			Limit(1).
+			Select("COALESCE(SUM(hold_ratio), 0)").Scan(&totalHold).Error
+		if err != nil {
+			return err
+		}
+		return nil
+		// totalHold = decimal.NewFromFloat(totalHold).Round(4).InexactFloat64()
+		// return tx.Model(&domain.CBBasic{}).Where("ts_code = ?", tsCode).Update("top10_ratio", totalHold).Error
 	})
 }
 
@@ -73,7 +89,7 @@ func (r *CBRepo) ListTSCodes(ctx context.Context) ([]string, error) {
 
 func (r *CBRepo) GetByTSCode(ctx context.Context, tsCode string) (domain.CBBasic, error) {
 	var items []domain.CBBasic
-	if err := r.db.WithContext(ctx).Where("ts_code = ?", tsCode).Limit(1).Find(&items).Error; err != nil {
+	if err := r.db.WithContext(ctx).Select(cbBasicColumns).Where("ts_code = ?", tsCode).Limit(1).Find(&items).Error; err != nil {
 		return domain.CBBasic{}, err
 	}
 	if len(items) == 0 {
@@ -106,7 +122,8 @@ func (r *CBRepo) Search(ctx context.Context, q string, limit, offset int, listed
 		return nil, 0, err
 	}
 	var items []domain.CBBasic
-	err := db.Order("list_date DESC NULLS LAST, ts_code").
+	err := db.Select(cbBasicColumns).
+		Order("list_date DESC NULLS LAST, ts_code").
 		Limit(limit).
 		Offset(offset).
 		Find(&items).Error
@@ -124,6 +141,7 @@ func (r *CBRepo) ListHolderPeriods(ctx context.Context, tsCode string) ([]time.T
 func (r *CBRepo) ListTopHolders(ctx context.Context, tsCode string, endDate time.Time) ([]domain.CBTopHolder, error) {
 	var items []domain.CBTopHolder
 	err := r.db.WithContext(ctx).
+		Select(cbHolderColumns).
 		Where("ts_code = ? AND end_date = ?", tsCode, endDate).
 		Order("holder_rank").
 		Find(&items).Error
@@ -262,7 +280,7 @@ func (r *CBRepo) SearchWithQuote(ctx context.Context, query CBListQuery) ([]CBLi
 
 	joinSQL, where, args := cbListJoinWhere(query)
 	sql := `
-SELECT b.*, q.quote_date, q.pre_close, q.close, q.change, q.pct_chg,
+SELECT ` + cbBasicSQLCols + `, q.quote_date, q.pre_close, q.close, q.change, q.pct_chg,
        q.volume, q.amount, q.cb_over_rate,
        th.top10_ratio, th.holder_count,
        ` + cbFloatSizeExpr + ` AS float_size

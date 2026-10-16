@@ -223,16 +223,16 @@ export function Backtest() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="gap-0 py-0">
+            <CardHeader className="px-4 py-3">
               <CardTitle>成交明细</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0">
               {fills.length === 0 ? (
-                <p className="text-sm text-muted-foreground">这段区间没有成交。</p>
+                <p className="px-4 pb-4 text-sm text-muted-foreground">这段区间没有成交。</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                <div className="overflow-x-auto border-t">
+                  <table className="w-full text-left text-sm [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
                     <thead className="text-muted-foreground">
                       <tr>
                         <th className="py-1 pr-3 font-medium">日期</th>

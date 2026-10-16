@@ -94,7 +94,7 @@ LEFT JOIN LATERAL (
 		args = append(args, like, like, like)
 	}
 	if query.ListedOnly {
-		where += " AND i.status = 'L'"
+		where += " AND i.list_status = 'L'"
 	}
 	return joinSQL, where, args
 }
@@ -116,7 +116,7 @@ func (r *InstrumentRepo) SearchWithQuote(ctx context.Context, query StockListQue
 		countDB = countDB.Where("ts_code ILIKE ? OR symbol ILIKE ? OR name ILIKE ?", like, like, like)
 	}
 	if query.ListedOnly {
-		countDB = countDB.Where("status = ?", "L")
+		countDB = countDB.Where("list_status = ?", "L")
 	}
 	var total int64
 	if err := countDB.Count(&total).Error; err != nil {
@@ -125,7 +125,7 @@ func (r *InstrumentRepo) SearchWithQuote(ctx context.Context, query StockListQue
 
 	joinSQL, where, args := stockListJoinWhere(query)
 	sql := `
-SELECT i.*, q.quote_date, q.pre_close, q.close, q.change, q.pct_chg,
+SELECT ` + instrumentSQLCols + `, q.quote_date, q.pre_close, q.close, q.change, q.pct_chg,
        q.volume, q.amount, q.is_limit_up, q.is_limit_down, q.is_paused
 FROM instrument i
 ` + joinSQL + `

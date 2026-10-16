@@ -110,6 +110,40 @@ func cmdIngest(ctx context.Context, cfg config.Config, args []string) error {
 			codes[i] = strings.ToUpper(strings.TrimSpace(codes[i]))
 		}
 		return svc.SyncCBDaily(ctx, start, end, tradeDate, codes)
+	case "index-basic":
+		return svc.SyncIndexBasic(ctx)
+	case "index-classify":
+		return svc.SyncIndexClassify(ctx)
+	case "index-daily":
+		start, end, codes, _, _, err := parseIngestFlags(args[1:], "", "")
+		if err != nil {
+			return err
+		}
+		if start.IsZero() || end.IsZero() {
+			return fmt.Errorf("index-daily 需要 -start 和 -end；可加 -code")
+		}
+		return svc.SyncIndexDaily(ctx, start, end, upperCodes(codes))
+	case "sw-daily":
+		start, end, codes, _, _, err := parseIngestFlags(args[1:], "", "")
+		if err != nil {
+			return err
+		}
+		if start.IsZero() || end.IsZero() {
+			return fmt.Errorf("sw-daily 需要 -start 和 -end；可加 -code")
+		}
+		return svc.SyncSWDaily(ctx, start, end, upperCodes(codes))
+	case "etf-basic":
+		return svc.SyncETFBasic(ctx)
+	case "etf-daily":
+		return ingestETFRange(ctx, svc.SyncETFDaily, args[1:], "etf-daily")
+	case "etf-adj":
+		return ingestETFRange(ctx, svc.SyncETFAdj, args[1:], "etf-adj")
+	case "etf-share":
+		return ingestETFRange(ctx, svc.SyncETFShareSize, args[1:], "etf-share")
+	case "etf-sh-cons":
+		return ingestETFRange(ctx, svc.SyncETFSHCons, args[1:], "etf-sh-cons")
+	case "etf-sz-cons":
+		return ingestETFRange(ctx, svc.SyncETFSZCons, args[1:], "etf-sz-cons")
 	default:
 		return fmt.Errorf("未知 ingest 子命令 %q", args[0])
 	}
@@ -161,6 +195,28 @@ func parseIngestFlags(args []string, defaultStart, defaultEnd string) (start, en
 	return start, end, codes, period, tradeDate, nil
 }
 
+func upperCodes(codes []string) []string {
+	out := make([]string, 0, len(codes))
+	for _, c := range codes {
+		c = strings.ToUpper(strings.TrimSpace(c))
+		if c != "" {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func ingestETFRange(ctx context.Context, fn func(context.Context, time.Time, time.Time, []string) error, args []string, name string) error {
+	start, end, codes, _, _, err := parseIngestFlags(args, "", "")
+	if err != nil {
+		return err
+	}
+	if start.IsZero() || end.IsZero() {
+		return fmt.Errorf("%s 需要 -start 和 -end；可加 -code", name)
+	}
+	return fn(ctx, start, end, upperCodes(codes))
+}
+
 func resolveCodes(ctx context.Context, instruments *repo.InstrumentRepo, codes []string) ([]string, error) {
 	out := make([]string, 0, len(codes))
 	for _, c := range codes {
@@ -185,15 +241,22 @@ func printIngestUsage() {
   ashare ingest cb-daily -date 20261015
   ashare ingest cb-daily -start 20261001 -end 20261015 [-code 110059.SH]
   ashare ingest cb-holders -period 20250630 [-code 110059.SH]
-  ashare ingest cb-holders -start 20240101 -end 20251231 [-code 110059.SH]
+  ashare ingest index-basic
+  ashare ingest index-classify
+  ashare ingest index-daily -start 20260101 -end 20261013 [-code 000300.SH]
+  ashare ingest sw-daily -start 20260101 -end 20261013 [-code 801010.SI]
+  ashare ingest etf-basic
+  ashare ingest etf-daily -start 20260101 -end 20261013 [-code 510330.SH]
+  ashare ingest etf-adj -start 20260101 -end 20261013 [-code 510330.SH]
+  ashare ingest etf-share -start 20260101 -end 20261013 [-code 510330.SH]
+  ashare ingest etf-sh-cons -start 20260101 -end 20261013 [-code 510330.SH]
+  ashare ingest etf-sz-cons -start 20260101 -end 20261013 [-code 159919.SZ]
 
 说明:
   全市场按交易日拉截面，请先 ingest calendar。
   -code 可写 000001.SZ 或 000001（需已有证券列表）。
-  cb-daily：-date 拉某日全市场截面；或 -start/-end，可加 -code。
-  cb-holders：-period / -start/-end / -code；-code 省略时同步库内全部转债。
-  cb-basic、cb-daily 约 2000 积分；cb-holders 约 5000 积分。
-  限流见 config.yaml 的 tushare.rpm.default / tushare.rpm.apis（未配置的接口用 default）。
-  也可在 Web「采集任务」页触发同步。
+  index-daily 未指定 -code 时同步库内全部指数（请先 index-basic）。
+  etf-basic 约 8000 积分；etf-daily 约 5000；份额/持仓约 8000。
+  限流见 config.yaml 的 tushare.rpm.default / tushare.rpm.apis。
 `)
 }

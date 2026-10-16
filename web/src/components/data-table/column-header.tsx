@@ -1,7 +1,6 @@
 import { ArrowDownIcon, ArrowUpIcon, CaretSortIcon } from '@radix-ui/react-icons'
 import { type Column } from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 
 type DataTableColumnHeaderProps<TData, TValue> =
   React.HTMLAttributes<HTMLDivElement> & {
@@ -21,11 +20,10 @@ export function DataTableColumnHeader<TData, TValue>({
   const sorted = column.getIsSorted()
 
   return (
-    <div className={cn('flex items-center space-x-2', className)}>
-      <Button
-        variant='ghost'
-        size='sm'
-        className='h-8'
+    <div className={cn('flex items-center', className)}>
+      <button
+        type='button'
+        className='-mx-2 inline-flex h-8 items-center rounded-md px-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground'
         onClick={() => column.toggleSorting(sorted === 'asc')}
       >
         <span>{title}</span>
@@ -36,7 +34,7 @@ export function DataTableColumnHeader<TData, TValue>({
         ) : (
           <CaretSortIcon className='ms-2 h-4 w-4' />
         )}
-      </Button>
+      </button>
     </div>
   )
 }

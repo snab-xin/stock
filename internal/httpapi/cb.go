@@ -32,6 +32,7 @@ type cbListItemDTO struct {
 	FloatSize         *float64 `json:"float_size,omitempty"`  // 流通规模（元）
 	Top10Ratio        *float64 `json:"top10_ratio,omitempty"` // 最近一期十大合计占比 %
 	QuoteDate         string   `json:"quote_date,omitempty"`
+	TradeDate         string   `json:"trade_date,omitempty"`
 	PreClose          *float64 `json:"pre_close,omitempty"`
 	Close             *float64 `json:"close,omitempty"`
 	Change            *float64 `json:"change,omitempty"`
@@ -272,6 +273,16 @@ type cbReplaceHoldersReq struct {
 	Holders []cbReplaceHolderItem `json:"holders"`
 }
 
+// cbReplaceHolders 替换可转债十大股东。
+// 请求体：
+//
+//	{
+//	  "period": "2026-01-01",
+//	  "holders": [
+//	    { "holder_rank": 1, "holder_name": "张三", "hold_amount": 1000000, "hold_ratio": 0.1 },
+//	    { "holder_rank": 2, "holder_name": "李四", "hold_amount": 800000, "hold_ratio": 0.08 },
+//	  ]
+//	}
 func (h *Handler) cbReplaceHolders(c *gin.Context) {
 	if h.cb == nil {
 		abortJSON(c, http.StatusServiceUnavailable, "可转债仓储未启用")
@@ -315,6 +326,7 @@ func (h *Handler) cbReplaceHolders(c *gin.Context) {
 			HolderName: name,
 			HoldAmount: &amt,
 			HoldRatio:  &rat,
+			Type:       1,
 		})
 	}
 	if _, err := h.cb.GetByTSCode(c.Request.Context(), code); err == gorm.ErrRecordNotFound {

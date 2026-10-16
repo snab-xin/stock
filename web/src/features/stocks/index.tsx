@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useMemo, useState, useTransition } from 'react'
 import { type SortingState } from '@tanstack/react-table'
-import { getRouteApi } from '@tanstack/react-router'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -13,15 +12,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { fetchStockList, type StockListItem } from '@/lib/api'
 import { StockTable } from './components/stock-table'
-import { resolveStockListSearch, toStockListSearchParams } from './list-search'
+import {
+  resolveStockListSearch,
+  toStockListSearchParams,
+  type StockListSearch,
+} from './list-search'
 
-const routeApi = getRouteApi('/_authenticated/stocks/')
 const limit = 50
 
-export function StockList() {
-  const search = routeApi.useSearch()
-  const navigate = routeApi.useNavigate()
+export const StockList = memo(function StockList({
+  search,
+  onSearchChange,
+}: {
+  search: StockListSearch
+  onSearchChange: (search: StockListSearch) => void
+}) {
   const resolved = resolveStockListSearch(search)
+  const [, startTransition] = useTransition()
 
   const [query, setQuery] = useState(resolved.q || '')
   const [items, setItems] = useState<StockListItem[]>([])
@@ -29,9 +36,21 @@ export function StockList() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const sorting: SortingState = [
-    { id: resolved.sortBy, desc: resolved.sortDir === 'desc' },
-  ]
+  const sorting = useMemo<SortingState>(
+    () => [{ id: resolved.sortBy, desc: resolved.sortDir === 'desc' }],
+    [resolved.sortBy, resolved.sortDir],
+  )
+  const listSearch = useMemo(
+    () =>
+      toStockListSearchParams({
+        q: resolved.q,
+        listedOnly: resolved.listedOnly,
+        sortBy: resolved.sortBy,
+        sortDir: resolved.sortDir,
+        offset: resolved.offset,
+      }),
+    [resolved.q, resolved.listedOnly, resolved.sortBy, resolved.sortDir, resolved.offset],
+  )
 
   function patchSearch(next: {
     q?: string
@@ -40,16 +59,14 @@ export function StockList() {
     sortDir?: 'asc' | 'desc'
     offset?: number
   }) {
-    void navigate({
-      search: toStockListSearchParams({
-        q: next.q !== undefined ? next.q : resolved.q,
-        listedOnly: next.listedOnly !== undefined ? next.listedOnly : resolved.listedOnly,
-        sortBy: next.sortBy !== undefined ? next.sortBy : resolved.sortBy,
-        sortDir: next.sortDir !== undefined ? next.sortDir : resolved.sortDir,
-        offset: next.offset !== undefined ? next.offset : resolved.offset,
-      }),
-      replace: true,
+    const nextSearch = toStockListSearchParams({
+      q: next.q !== undefined ? next.q : resolved.q,
+      listedOnly: next.listedOnly !== undefined ? next.listedOnly : resolved.listedOnly,
+      sortBy: next.sortBy !== undefined ? next.sortBy : resolved.sortBy,
+      sortDir: next.sortDir !== undefined ? next.sortDir : resolved.sortDir,
+      offset: next.offset !== undefined ? next.offset : resolved.offset,
     })
+    startTransition(() => onSearchChange(nextSearch))
   }
 
   useEffect(() => {
@@ -85,7 +102,7 @@ export function StockList() {
         .finally(() => setLoading(false))
     }, 250)
     return () => window.clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- patch via navigate; load on resolved
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- patch via onSearchChange; load on resolved
   }, [query, resolved.q, resolved.listedOnly, resolved.sortBy, resolved.sortDir, resolved.offset])
 
   const quoteHint = items.find((it) => it.quote_date)?.quote_date
@@ -138,21 +155,15 @@ export function StockList() {
           </p>
         ) : null}
 
-        <Card>
-          <CardHeader>
+        <Card className='gap-0 py-0'>
+          <CardHeader className='px-4 py-3'>
             <CardTitle>列表</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className='px-0'>
             <StockTable
               data={items}
               loading={loading}
-              listSearch={toStockListSearchParams({
-                q: resolved.q,
-                listedOnly: resolved.listedOnly,
-                sortBy: resolved.sortBy,
-                sortDir: resolved.sortDir,
-                offset: resolved.offset,
-              })}
+              listSearch={listSearch}
               sorting={sorting}
               onSortingChange={(updater) => {
                 const next = typeof updater === 'function' ? updater(sorting) : updater
@@ -165,7 +176,7 @@ export function StockList() {
               }}
             />
 
-            <div className='mt-4 flex items-center gap-2'>
+            <div className='flex items-center gap-2 px-4 py-3'>
               <Button
                 variant='outline'
                 size='sm'
@@ -194,4 +205,4 @@ export function StockList() {
       </Main>
     </>
   )
-}
+})

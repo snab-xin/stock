@@ -55,6 +55,7 @@ export type IngestRun = {
   rows_affected: number
   started_at: string
   finished_at?: string
+  params?: Record<string, unknown>
 }
 
 export type IngestJobStatus = {
@@ -147,7 +148,24 @@ export type BacktestResult = {
 }
 
 export type StartIngestRequest = {
-  job: 'calendar' | 'instruments' | 'daily' | 'sync' | 'cb-basic' | 'cb-holders' | 'cb-daily'
+  job:
+    | 'calendar'
+    | 'instruments'
+    | 'daily'
+    | 'sync'
+    | 'cb-basic'
+    | 'cb-holders'
+    | 'cb-daily'
+    | 'index-basic'
+    | 'index-classify'
+    | 'index-daily'
+    | 'sw-daily'
+    | 'etf-basic'
+    | 'etf-daily'
+    | 'etf-adj'
+    | 'etf-share'
+    | 'etf-sh-cons'
+    | 'etf-sz-cons'
   start?: string
   end?: string
   period?: string

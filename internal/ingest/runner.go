@@ -55,7 +55,7 @@ func (r *Runner) Start(parent context.Context, req JobRequest) error {
 	job := strings.TrimSpace(strings.ToLower(req.Job))
 	job = strings.ReplaceAll(job, "_", "-")
 	if job == "" {
-		return fmt.Errorf("缺少 job，可选 calendar / instruments / daily / sync / cb-basic / cb-holders / cb-daily")
+		return fmt.Errorf("缺少 job")
 	}
 
 	codes := append([]string{}, req.Codes...)
@@ -70,7 +70,10 @@ func (r *Runner) Start(parent context.Context, req JobRequest) error {
 
 	var start, end, period, tradeDate time.Time
 	var err error
-	needRange := job == "calendar" || job == "daily" || job == "sync"
+	needRange := job == "calendar" || job == "daily" || job == "sync" ||
+		job == "index-daily" || job == "sw-daily" ||
+		job == "etf-daily" || job == "etf-adj" || job == "etf-share" ||
+		job == "etf-sh-cons" || job == "etf-sz-cons"
 	if needRange {
 		if strings.TrimSpace(req.Start) == "" || strings.TrimSpace(req.End) == "" {
 			return fmt.Errorf("%s 需要 start 和 end（YYYYMMDD）", job)
@@ -223,6 +226,26 @@ func (r *Runner) run(ctx context.Context, job string, start, end, period, tradeD
 		err = r.svc.SyncCBTopHolders(ctx, period, start, end, normalizeCBCodes(codes))
 	case "cb-daily":
 		err = r.svc.SyncCBDaily(ctx, start, end, tradeDate, normalizeCBCodes(codes))
+	case "index-basic":
+		err = r.svc.SyncIndexBasic(ctx)
+	case "index-classify":
+		err = r.svc.SyncIndexClassify(ctx)
+	case "index-daily":
+		err = r.svc.SyncIndexDaily(ctx, start, end, normalizeCBCodes(codes))
+	case "sw-daily":
+		err = r.svc.SyncSWDaily(ctx, start, end, normalizeCBCodes(codes))
+	case "etf-basic":
+		err = r.svc.SyncETFBasic(ctx)
+	case "etf-daily":
+		err = r.svc.SyncETFDaily(ctx, start, end, normalizeCBCodes(codes))
+	case "etf-adj":
+		err = r.svc.SyncETFAdj(ctx, start, end, normalizeCBCodes(codes))
+	case "etf-share":
+		err = r.svc.SyncETFShareSize(ctx, start, end, normalizeCBCodes(codes))
+	case "etf-sh-cons":
+		err = r.svc.SyncETFSHCons(ctx, start, end, normalizeCBCodes(codes))
+	case "etf-sz-cons":
+		err = r.svc.SyncETFSZCons(ctx, start, end, normalizeCBCodes(codes))
 	default:
 		err = fmt.Errorf("未知 job %q", job)
 	}

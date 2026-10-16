@@ -11,7 +11,7 @@ import (
 
 func (r *InstrumentRepo) GetByTSCode(ctx context.Context, tsCode string) (domain.Instrument, error) {
 	var items []domain.Instrument
-	if err := r.db.WithContext(ctx).Where("ts_code = ?", tsCode).Limit(1).Find(&items).Error; err != nil {
+	if err := r.db.WithContext(ctx).Select(instrumentColumns).Where("ts_code = ?", tsCode).Limit(1).Find(&items).Error; err != nil {
 		return domain.Instrument{}, err
 	}
 	if len(items) == 0 {
@@ -22,7 +22,7 @@ func (r *InstrumentRepo) GetByTSCode(ctx context.Context, tsCode string) (domain
 
 func (r *InstrumentRepo) FindBySymbol(ctx context.Context, symbol string) ([]domain.Instrument, error) {
 	var items []domain.Instrument
-	err := r.db.WithContext(ctx).Where("symbol = ?", symbol).Find(&items).Error
+	err := r.db.WithContext(ctx).Select(instrumentColumns).Where("symbol = ?", symbol).Find(&items).Error
 	return items, err
 }
 
@@ -37,6 +37,7 @@ func (r *InstrumentRepo) Search(ctx context.Context, q string, limit int) ([]dom
 	like := "%" + q + "%"
 	var items []domain.Instrument
 	err := r.db.WithContext(ctx).
+		Select(instrumentColumns).
 		Where("ts_code ILIKE ? OR symbol ILIKE ? OR name ILIKE ?", like, like, like).
 		Order("ts_code").
 		Limit(limit).
@@ -46,7 +47,7 @@ func (r *InstrumentRepo) Search(ctx context.Context, q string, limit int) ([]dom
 
 func (r *MarketRepo) ListOpenDays(ctx context.Context, exchange string, start, end time.Time) ([]time.Time, error) {
 	var rows []domain.TradeCalendar
-	q := r.db.WithContext(ctx).Where("exchange = ? AND is_open = ?", exchange, true)
+	q := r.db.WithContext(ctx).Select("cal_date").Where("exchange = ? AND is_open = ?", exchange, true)
 	if !start.IsZero() {
 		q = q.Where("cal_date >= ?", start)
 	}
@@ -105,7 +106,7 @@ func barTable(qfq bool, period BarPeriod) string {
 
 func (r *MarketRepo) ListDailyBars(ctx context.Context, tsCode string, start, end time.Time, limit int, qfq bool, period BarPeriod) ([]domain.DailyBar, error) {
 	table := barTable(qfq, period)
-	q := r.db.WithContext(ctx).Table(table).Where("ts_code = ?", tsCode)
+	q := r.db.WithContext(ctx).Table(table).Select(dailyBarColumns).Where("ts_code = ?", tsCode)
 	if !start.IsZero() {
 		q = q.Where("trade_date >= ?", start)
 	}
@@ -137,6 +138,7 @@ func (r *MarketRepo) ListDailyBarsBefore(ctx context.Context, tsCode string, bef
 	table := barTable(qfq, period)
 	var rows []domain.DailyBar
 	err := r.db.WithContext(ctx).Table(table).
+		Select(dailyBarColumns).
 		Where("ts_code = ? AND trade_date < ?", tsCode, before).
 		Order("trade_date DESC").
 		Limit(limit).

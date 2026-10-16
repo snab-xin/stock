@@ -20,11 +20,17 @@ import {
   type IngestRun,
   type StartIngestRequest,
 } from '@/lib/api'
+import { formatISODateTimeStr } from '@/lib/date'
 
 function statusVariant(status: string) {
   if (status === 'success') return 'success' as const
   if (status === 'failed') return 'warning' as const
   return 'secondary' as const
+}
+
+function formatParams(params: Record<string, unknown> | undefined) {
+  if (!params || Object.keys(params).length === 0) return ''
+  return JSON.stringify(params)
 }
 
 function todayYYYYMMDD() {
@@ -136,7 +142,18 @@ export function Ingest() {
         }
       }
       if (code.trim()) body.code = code.trim()
-      if ((job === 'daily' || job === 'sync') && !body.code) {
+      if (
+        (job === 'daily' ||
+          job === 'sync' ||
+          job === 'index-daily' ||
+          job === 'sw-daily' ||
+          job === 'etf-daily' ||
+          job === 'etf-adj' ||
+          job === 'etf-share' ||
+          job === 'etf-sh-cons' ||
+          job === 'etf-sz-cons') &&
+        !body.code
+      ) {
         const ok = window.confirm('未填写代码将按交易日拉全市场日线，可能很慢且消耗大量积分。继续？')
         if (!ok) {
           setSubmitting(false)
@@ -162,10 +179,28 @@ export function Ingest() {
     }
   }
 
-  const needRange = job !== 'instruments' && job !== 'cb-basic' && job !== 'cb-holders' && job !== 'cb-daily'
+  const needRange =
+    job !== 'instruments' &&
+    job !== 'cb-basic' &&
+    job !== 'cb-holders' &&
+    job !== 'cb-daily' &&
+    job !== 'index-basic' &&
+    job !== 'index-classify' &&
+    job !== 'etf-basic'
   const isCBHolders = job === 'cb-holders'
   const isCBDaily = job === 'cb-daily'
-  const showCode = job === 'daily' || job === 'sync' || job === 'cb-holders' || job === 'cb-daily'
+  const showCode =
+    job === 'daily' ||
+    job === 'sync' ||
+    job === 'cb-holders' ||
+    job === 'cb-daily' ||
+    job === 'index-daily' ||
+    job === 'sw-daily' ||
+    job === 'etf-daily' ||
+    job === 'etf-adj' ||
+    job === 'etf-share' ||
+    job === 'etf-sh-cons' ||
+    job === 'etf-sz-cons'
   const running = Boolean(jobStatus?.running)
 
   return (
@@ -213,6 +248,16 @@ export function Ingest() {
                 ['cb-basic', '转债基础'],
                 ['cb-daily', '转债行情'],
                 ['cb-holders', '转债十大持有人'],
+                ['index-basic', '指数列表'],
+                ['index-classify', '申万行业'],
+                ['index-daily', '指数日线'],
+                ['sw-daily', '申万日线'],
+                ['etf-basic', 'ETF列表'],
+                ['etf-daily', 'ETF日线'],
+                ['etf-adj', 'ETF复权'],
+                ['etf-share', 'ETF份额'],
+                ['etf-sh-cons', 'ETF持仓沪'],
+                ['etf-sz-cons', 'ETF持仓深'],
               ] as const
             ).map(([value, label]) => (
               <Button
@@ -356,41 +401,58 @@ export function Ingest() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card className="gap-0 py-0">
+        <CardHeader className="px-4 py-3">
           <CardTitle>最近任务</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           {error ? (
-            <p className="text-sm text-destructive">{error}。请先启动：go run ./cmd/ashare web</p>
+            <p className="px-4 pb-4 text-sm text-destructive">{error}。请先启动：go run ./cmd/ashare web</p>
           ) : rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">还没有采集记录。</p>
+            <p className="px-4 pb-4 text-sm text-muted-foreground">还没有采集记录。</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto border-t">
+              <table className="w-full text-left text-sm [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
                 <thead className="text-muted-foreground">
                   <tr className="border-b">
                     <th className="py-2 pr-3 font-medium">任务</th>
                     <th className="py-2 pr-3 font-medium">状态</th>
                     <th className="py-2 pr-3 font-medium">行数</th>
                     <th className="py-2 pr-3 font-medium">开始</th>
+                    <th className="py-2 pr-3 font-medium">结束</th>
+                    <th className="py-2 pr-3 font-medium">参数</th>
                     <th className="py-2 pr-3 font-medium">说明</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id} className="border-b last:border-0">
-                      <td className="py-2 pr-3">{row.job_name}</td>
-                      <td className="py-2 pr-3">
-                        <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
-                      </td>
-                      <td className="py-2 pr-3">{row.rows_affected}</td>
-                      <td className="py-2 pr-3 whitespace-nowrap">
-                        {row.started_at.replace('T', ' ').slice(0, 19)}
-                      </td>
-                      <td className="max-w-md truncate py-2 pr-3 text-muted-foreground">{row.message}</td>
-                    </tr>
-                  ))}
+                  {rows.map((row) => {
+                    const paramsText = formatParams(row.params)
+                    return (
+                      <tr key={row.id} className="border-b last:border-0">
+                        <td className="py-2 pr-3">{row.job_name}</td>
+                        <td className="py-2 pr-3">
+                          <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+                        </td>
+                        <td className="py-2 pr-3">{row.rows_affected}</td>
+                        <td className="py-2 pr-3 whitespace-nowrap">
+                          {formatISODateTimeStr(row.started_at)}
+                        </td>
+                        <td className="py-2 pr-3 whitespace-nowrap">
+                          {row.finished_at ? formatISODateTimeStr(row.finished_at) : '—'}
+                        </td>
+                        <td className="max-w-xl py-2 pr-3 align-top">
+                          {paramsText ? (
+                            <pre className="overflow-x-auto rounded bg-muted/50 px-2 py-1 font-mono text-[11px] leading-5 text-muted-foreground">
+                              {paramsText}
+                            </pre>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="max-w-md truncate py-2 pr-3 text-muted-foreground">{row.message}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

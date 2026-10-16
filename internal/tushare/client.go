@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -94,6 +95,35 @@ type apiResponse struct {
 		Fields []string `json:"fields"`
 		Items  [][]any  `json:"items"`
 	} `json:"data"`
+}
+
+func cloneParams(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in)+2)
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+// QueryPages 按 offset/limit 翻页，直到不足一页。pageSize<=0 时用 2000。
+func (c *Client) QueryPages(ctx context.Context, apiName string, params map[string]string, fields string, pageSize int) ([]Row, error) {
+	if pageSize <= 0 {
+		pageSize = 2000
+	}
+	var all []Row
+	for offset := 0; ; offset += pageSize {
+		p := cloneParams(params)
+		p["offset"] = strconv.Itoa(offset)
+		p["limit"] = strconv.Itoa(pageSize)
+		rows, err := c.Query(ctx, apiName, p, fields)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, rows...)
+		if len(rows) < pageSize {
+			return all, nil
+		}
+	}
 }
 
 func (c *Client) Query(ctx context.Context, apiName string, params map[string]string, fields string) ([]Row, error) {

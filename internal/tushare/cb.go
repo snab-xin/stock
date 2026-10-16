@@ -23,6 +23,7 @@ const cbDailyFields = "ts_code,trade_date,pre_close,open,high,low,close,change,p
 	"bond_value,bond_over_rate,cb_value,cb_over_rate"
 
 func (s *Source) ListCBBasic(ctx context.Context) ([]domain.CBBasic, error) {
+	// 可转债基本信息 https://tushare.pro/document/2?doc_id=185
 	const page = 2000
 	var all []domain.CBBasic
 	for offset := 0; ; offset += page {
@@ -47,6 +48,7 @@ func (s *Source) ListCBBasic(ctx context.Context) ([]domain.CBBasic, error) {
 }
 
 func (s *Source) ListCBTopHolders(ctx context.Context, q ingest.CBHolderQuery) ([]domain.CBTopHolder, error) {
+	// 可转债十大持有人 https://tushare.pro/document/2?doc_id=459
 	if len(q.TSCodes) == 0 {
 		return nil, fmt.Errorf("top10_cb_holders 需要至少一只转债代码")
 	}
@@ -81,6 +83,7 @@ func (s *Source) ListCBTopHolders(ctx context.Context, q ingest.CBHolderQuery) (
 }
 
 func (s *Source) ListCBDaily(ctx context.Context, q ingest.CBDailyQuery) ([]domain.CBDaily, error) {
+	// 可转债日线行情 https://tushare.pro/document/2?doc_id=187
 	params := map[string]string{}
 	if q.TSCode != "" {
 		params["ts_code"] = q.TSCode
@@ -213,5 +216,6 @@ func cbTopHolderFromRow(row Row) (domain.CBTopHolder, bool) {
 		HolderName: row.Str("holder_name"),
 		HoldAmount: row.FloatPtr("hold_amount"),
 		HoldRatio:  row.FloatPtr("hold_ratio"),
+		Type:       0,
 	}, true
 }

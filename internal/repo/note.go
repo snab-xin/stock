@@ -29,7 +29,7 @@ func (r *NoteRepo) List(ctx context.Context, userID int64, tsCode, targetType st
 		q = q.Where("target_type = ?", targetType)
 	}
 	var items []domain.UserNote
-	err := q.Order("trade_date DESC, id DESC").Limit(limit).Find(&items).Error
+	err := q.Select(noteColumns).Order("trade_date DESC, id DESC").Limit(limit).Find(&items).Error
 	return items, err
 }
 
@@ -50,7 +50,7 @@ func (r *NoteRepo) Marks(ctx context.Context, userID int64, tsCode string) ([]do
 
 func (r *NoteRepo) Get(ctx context.Context, userID, id int64) (domain.UserNote, error) {
 	var items []domain.UserNote
-	err := r.db.WithContext(ctx).Where("user_id = ? AND id = ?", userID, id).Limit(1).Find(&items).Error
+	err := r.db.WithContext(ctx).Select(noteColumns).Where("user_id = ? AND id = ?", userID, id).Limit(1).Find(&items).Error
 	if err != nil {
 		return domain.UserNote{}, err
 	}

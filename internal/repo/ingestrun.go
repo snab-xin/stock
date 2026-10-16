@@ -16,11 +16,12 @@ func NewIngestRunRepo(db *gorm.DB) *IngestRunRepo {
 	return &IngestRunRepo{db: db}
 }
 
-func (r *IngestRunRepo) Start(ctx context.Context, jobName string) (*domain.IngestRun, error) {
+func (r *IngestRunRepo) Start(ctx context.Context, jobName string, params domain.JSONObject) (*domain.IngestRun, error) {
 	run := &domain.IngestRun{
 		JobName:   jobName,
 		StartedAt: time.Now(),
 		Status:    "running",
+		Params:    params,
 	}
 	if err := r.db.WithContext(ctx).Create(run).Error; err != nil {
 		return nil, err
@@ -33,7 +34,7 @@ func (r *IngestRunRepo) ListRecent(ctx context.Context, limit int) ([]domain.Ing
 		limit = 30
 	}
 	var rows []domain.IngestRun
-	err := r.db.WithContext(ctx).Order("id DESC").Limit(limit).Find(&rows).Error
+	err := r.db.WithContext(ctx).Select(ingestRunColumns).Order("id DESC").Limit(limit).Find(&rows).Error
 	return rows, err
 }
 

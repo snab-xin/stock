@@ -49,7 +49,7 @@ func (r Row) Str(key string) string {
 
 func (r Row) Float(key string) (float64, bool) {
 	s := r.Str(key)
-	if s == "" || s == "nan" || s == "NaN" || s == "None" {
+	if s == "" || s == "nan" || s == "NaN" || s == "None" || s == "-" {
 		return 0, false
 	}
 	v, err := strconv.ParseFloat(s, 64)
@@ -112,6 +112,33 @@ func (r Row) Int(key string) (int, bool) {
 
 func (r Row) IntPtr(key string) *int {
 	v, ok := r.Int(key)
+	if !ok {
+		return nil
+	}
+	return &v
+}
+
+func (r Row) Int64(key string) (int64, bool) {
+	s := r.Str(key)
+	if s == "" || s == "nan" || s == "NaN" || s == "None" || s == "-" {
+		return 0, false
+	}
+	if strings.Contains(s, ".") {
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, false
+		}
+		return int64(math.Round(f)), true
+	}
+	v, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+func (r Row) Int64Ptr(key string) *int64 {
+	v, ok := r.Int64(key)
 	if !ok {
 		return nil
 	}

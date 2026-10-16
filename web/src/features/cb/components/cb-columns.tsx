@@ -42,6 +42,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   return [
   {
     accessorKey: 'ts_code',
+    enableSorting: true,
     header: ({ column }) => <DataTableColumnHeader column={column} title='代码' />,
     cell: ({ row }) => (
       <Link
@@ -56,11 +57,13 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     accessorKey: 'bond_short_name',
+    enableSorting: true,
     header: ({ column }) => <DataTableColumnHeader column={column} title='简称' />,
     cell: ({ row }) => row.original.bond_short_name || '—',
   },
   {
     accessorKey: 'close',
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='现价' className='justify-end' />
     ),
@@ -72,6 +75,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     accessorKey: 'change',
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='涨跌' className='justify-end' />
     ),
@@ -83,6 +87,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     accessorKey: 'pct_chg',
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='涨跌幅' className='justify-end' />
     ),
@@ -94,6 +99,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     accessorKey: 'cb_over_rate',
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='溢价' className='justify-end' />
     ),
@@ -103,6 +109,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     accessorKey: 'issue_size',
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='初始规模' className='justify-end' />
     ),
@@ -112,6 +119,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     accessorKey: 'remain_size',
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='剩余规模' className='justify-end' />
     ),
@@ -121,6 +129,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     accessorKey: 'float_size',
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='流通规模' className='justify-end' />
     ),
@@ -130,6 +139,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     id: 'stk',
+    enableSorting: false,
     accessorFn: (row) =>
       [row.stk_code, row.stk_short_name].filter(Boolean).join(' '),
     header: ({ column }) => <DataTableColumnHeader column={column} title='正股' />,
@@ -137,6 +147,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     accessorKey: 'conv_price',
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='转股价' className='justify-end' />
     ),
@@ -146,6 +157,7 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     accessorKey: 'maturity_call_price',
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='到期价' className='justify-end' />
     ),
@@ -157,12 +169,14 @@ export function cbColumns(listSearch: CBListSearch): ColumnDef<CBListItem>[] {
   },
   {
     id: 'rating',
+    enableSorting: false,
     accessorFn: (row) => row.newest_rating || row.issue_rating || '',
     header: ({ column }) => <DataTableColumnHeader column={column} title='评级' />,
     cell: ({ getValue }) => getValue<string>() || '—',
   },
   {
     accessorKey: 'quote_date',
+    enableSorting: true,
     header: ({ column }) => <DataTableColumnHeader column={column} title='行情日' />,
     cell: ({ row }) => {
       const it = row.original

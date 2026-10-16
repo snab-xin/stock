@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -25,14 +26,14 @@ type StockTableProps = {
   onSortingChange: OnChangeFn<SortingState>
 }
 
-export function StockTable({
+export const StockTable = memo(function StockTable({
   data,
   loading,
   listSearch,
   sorting,
   onSortingChange,
 }: StockTableProps) {
-  const columns = stockColumns(listSearch)
+  const columns = useMemo(() => stockColumns(listSearch), [listSearch])
   const table = useReactTable({
     data,
     columns,
@@ -44,7 +45,7 @@ export function StockTable({
   })
 
   return (
-    <div className='overflow-hidden rounded-md border'>
+    <div className='overflow-x-auto border-y'>
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -84,4 +85,4 @@ export function StockTable({
       </Table>
     </div>
   )
-}
+})

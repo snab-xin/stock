@@ -17,7 +17,9 @@ func NewInstrumentRepo(db *gorm.DB) *InstrumentRepo {
 
 func (r *InstrumentRepo) Upsert(ctx context.Context, items []domain.Instrument) error {
 	return upsert(ctx, r.db, &items, []string{"ts_code"}, []string{
-		"symbol", "name", "exchange", "asset_type",
-		"list_date", "delist_date", "is_st", "status",
+		"symbol", "name", "area", "industry", "fullname", "enname", "cnspell",
+		"market", "exchange", "curr_type", "list_status",
+		"list_date", "delist_date", "is_hs", "act_name", "act_ent_type",
+		"asset_type", "is_st",
 	})
 }

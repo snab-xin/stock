@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -25,14 +26,14 @@ type CBTableProps = {
   onSortingChange: OnChangeFn<SortingState>
 }
 
-export function CBTable({
+export const CBTable = memo(function CBTable({
   data,
   loading,
   listSearch,
   sorting,
   onSortingChange,
 }: CBTableProps) {
-  const columns = cbColumns(listSearch)
+  const columns = useMemo(() => cbColumns(listSearch), [listSearch])
   const table = useReactTable({
     data,
     columns,
@@ -44,7 +45,7 @@ export function CBTable({
   })
 
   return (
-    <div className='overflow-hidden rounded-md border'>
+    <div className='overflow-x-auto border-y'>
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -84,4 +85,4 @@ export function CBTable({
       </Table>
     </div>
   )
-}
+})

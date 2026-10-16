@@ -45,7 +45,7 @@ func (r *UserRepo) Create(ctx context.Context, username, password string) (domai
 
 func (r *UserRepo) GetByUsername(ctx context.Context, username string) (domain.User, error) {
 	var items []domain.User
-	err := r.db.WithContext(ctx).Where("username = ?", strings.TrimSpace(username)).Limit(1).Find(&items).Error
+	err := r.db.WithContext(ctx).Select(userColumns).Where("username = ?", strings.TrimSpace(username)).Limit(1).Find(&items).Error
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -57,7 +57,7 @@ func (r *UserRepo) GetByUsername(ctx context.Context, username string) (domain.U
 
 func (r *UserRepo) GetByID(ctx context.Context, id int64) (domain.User, error) {
 	var items []domain.User
-	err := r.db.WithContext(ctx).Where("id = ?", id).Limit(1).Find(&items).Error
+	err := r.db.WithContext(ctx).Select(userColumns).Where("id = ?", id).Limit(1).Find(&items).Error
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -91,6 +91,7 @@ func (r *UserRepo) CreateSession(ctx context.Context, userID int64, token string
 func (r *UserRepo) UserByToken(ctx context.Context, token string) (domain.User, error) {
 	var sessions []domain.UserSession
 	err := r.db.WithContext(ctx).
+		Select("id", "user_id", "token_hash", "expires_at", "created_at").
 		Where("token_hash = ? AND expires_at > ?", HashToken(token), time.Now()).
 		Limit(1).
 		Find(&sessions).Error
