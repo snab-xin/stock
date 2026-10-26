@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/stock/ashare/internal/dates"
+	"github.com/stock/ashare/internal/pkg/dates"
 	"github.com/stock/ashare/internal/domain"
 )
 

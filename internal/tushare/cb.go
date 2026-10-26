@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stock/ashare/internal/dates"
+	"github.com/stock/ashare/internal/pkg/dates"
 	"github.com/stock/ashare/internal/domain"
 	"github.com/stock/ashare/internal/ingest"
 )

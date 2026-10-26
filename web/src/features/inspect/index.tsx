@@ -352,7 +352,7 @@ export function Inspect({
           </div>
         </div>
 
-        <p className='text-sm text-muted-foreground'>
+        <p className='text-sm text-muted-foreground' style={{ display: 'none' }}>
           核对复权、涨跌停、停牌和缺日。周/月线由日线在库内聚合。右滑可加载更早 K
           线。上一个/下一个按股票列表当前筛选与排序。
         </p>

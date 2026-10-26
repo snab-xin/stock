@@ -1,5 +1,8 @@
 http_addr: "127.0.0.1:8080"
 
+app:
+  mock_user: true
+
 log:
   level: info
   format: text

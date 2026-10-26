@@ -12,7 +12,7 @@ import (
 	"github.com/stock/ashare/internal/app"
 	"github.com/stock/ashare/internal/applog"
 	"github.com/stock/ashare/internal/config"
-	"github.com/stock/ashare/internal/dates"
+	"github.com/stock/ashare/internal/pkg/dates"
 	"github.com/stock/ashare/internal/db"
 	"github.com/stock/ashare/internal/ingest"
 	"github.com/stock/ashare/internal/repo"
@@ -39,8 +39,8 @@ func cmdIngest(ctx context.Context, cfg config.Config, args []string) error {
 		"apis", cfg.TushareAPIs,
 		"gap", cfg.MinInterval().Round(time.Millisecond).String(),
 	)
-
-	switch args[0] {
+	var cmd = args[0]
+	switch cmd {
 	case "help", "-h", "--help":
 		printIngestUsage()
 		return nil

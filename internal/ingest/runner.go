@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/stock/ashare/internal/applog"
-	"github.com/stock/ashare/internal/dates"
+	"github.com/stock/ashare/internal/pkg/dates"
 )
 
 type JobRequest struct {
@@ -19,6 +19,24 @@ type JobRequest struct {
 	Date   string   `json:"date"`   // 可转债行情交易日 YYYYMMDD（截面）
 	Code   string   `json:"code"`
 	Codes  []string `json:"codes"`
+}
+
+// 下一个周期
+func (r *JobRequest) NextPeriod() error {
+	if r.Start == "" {
+		r.Start = "20200101"
+	}
+	start, err := dates.Parse(r.Start)
+	if err != nil {
+		return err
+	}
+	end := start.AddDate(1, 0, 0)
+	now := time.Now()
+	if end.After(now) {
+		end = now
+	}
+	r.End = dates.YYYYMMDD(end)
+	return nil
 }
 
 type JobStatus struct {

@@ -2,8 +2,10 @@ package repo
 
 import (
 	"context"
+	"time"
 
 	"github.com/stock/ashare/internal/domain"
+	"github.com/stock/ashare/internal/pkg/streamutil"
 	"gorm.io/gorm"
 )
 
@@ -50,6 +52,12 @@ func (r *MarketRepo) UpsertAdjFactors(ctx context.Context, rows []domain.AdjFact
 }
 
 func (r *MarketRepo) UpsertSuspensions(ctx context.Context, rows []domain.Suspension) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	rows = streamutil.Distinct(rows, func(s domain.Suspension) string {
+		return s.TSCode + s.TradeDate.Format(time.DateOnly)
+	})
 	return upsert(ctx, r.db, &rows, []string{"ts_code", "trade_date"}, []string{
 		"suspend_timing", "suspend_type",
 	})

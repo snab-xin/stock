@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stock/ashare/internal/dates"
+	"github.com/stock/ashare/internal/pkg/dates"
 )
 
 type Row map[string]string

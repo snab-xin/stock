@@ -28,6 +28,17 @@ type Config struct {
 	TushareAPIs map[string]int
 	Backtest    Backtest
 	Log         Log
+	App         App
+}
+
+type App struct {
+	MockUser bool `json:"mock_user"`
+}
+
+func DefaultApp() App {
+	return App{
+		MockUser: false,
+	}
 }
 
 type Log struct {

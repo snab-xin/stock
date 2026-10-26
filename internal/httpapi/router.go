@@ -61,6 +61,7 @@ func newEngine(h *Handler) *gin.Engine {
 		api.POST("/indicators", h.indicators)
 		api.GET("/gaps", h.gaps)
 		api.GET("/ingest-runs", h.ingestRuns)
+		api.GET("/ingest/next-period", h.nextIngestPeriod)
 		api.GET("/ingest/status", h.ingestStatus)
 		api.POST("/ingest", h.ingestStart)
 		api.POST("/backtest", h.backtest)

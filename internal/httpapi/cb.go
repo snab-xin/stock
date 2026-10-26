@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/stock/ashare/internal/dates"
+	"github.com/stock/ashare/internal/pkg/dates"
 	"github.com/stock/ashare/internal/domain"
 	"github.com/stock/ashare/internal/repo"
 	"gorm.io/gorm"

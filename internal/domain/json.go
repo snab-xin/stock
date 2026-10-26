@@ -58,3 +58,7 @@ func (j *JSONObject) UnmarshalJSON(b []byte) error {
 	*j = append(JSONObject(nil), b...)
 	return nil
 }
+
+func (j JSONObject) Unmarshal(v any) error {
+	return json.Unmarshal(j, v)
+}

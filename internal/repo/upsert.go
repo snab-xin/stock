@@ -11,6 +11,7 @@ import (
 
 const upsertBatchSize = 500
 
+// upsert 插入或更新数据，使用 ON CONFLICT 语句。
 func upsert(ctx context.Context, db *gorm.DB, slicePtr any, conflictCols []string, updateCols []string) error {
 	v := reflect.ValueOf(slicePtr)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Slice {

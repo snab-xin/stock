@@ -57,7 +57,8 @@ func (s *Source) ListIndexDaily(ctx context.Context, q ingest.BarQuery) ([]domai
 func (s *Source) ListIndexClassify(ctx context.Context) ([]domain.IndexClassify, error) {
 	// 申万行业分类 https://tushare.pro/document/2?doc_id=181
 	var all []domain.IndexClassify
-	for _, src := range []string{"SW2014", "SW2021"} {
+	// 只保留SW2021 不同步 SW2014
+	for _, src := range []string{"SW2021"} {
 		rows, err := s.client.Query(ctx, "index_classify", map[string]string{
 			"src": src,
 		}, indexClassifyFields)

@@ -12,7 +12,7 @@ import (
 	"github.com/stock/ashare/internal/applog"
 	"github.com/stock/ashare/internal/backtest"
 	"github.com/stock/ashare/internal/config"
-	"github.com/stock/ashare/internal/dates"
+	"github.com/stock/ashare/internal/pkg/dates"
 	"github.com/stock/ashare/internal/db"
 	"github.com/stock/ashare/internal/repo"
 )

@@ -112,6 +112,13 @@ func (h *Handler) requireUser(c *gin.Context) {
 }
 
 func (h *Handler) currentUser(c *gin.Context) (domain.User, bool) {
+	if h.cfg.App.MockUser {
+		user, err := h.users.GetByUsername(c.Request.Context(), "abb")
+		if err != nil {
+			return domain.User{}, false
+		}
+		return user, true
+	}
 	token, err := c.Cookie(sessionCookie)
 	if err != nil || token == "" || h.users == nil {
 		return domain.User{}, false
